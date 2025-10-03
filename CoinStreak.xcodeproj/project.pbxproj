@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A45109412E904FF700E4AE05 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = A45109402E904FEE00E4AE05 /* .gitignore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A45109242E904C7F00E4AE05 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		A45109122E904C7E00E4AE05 /* CoinStreak.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CoinStreak.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A45109232E904C7F00E4AE05 /* CoinStreakTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CoinStreakTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A451092D2E904C7F00E4AE05 /* CoinStreakUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CoinStreakUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A45109402E904FEE00E4AE05 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -75,6 +80,7 @@
 		A45109092E904C7D00E4AE05 = {
 			isa = PBXGroup;
 			children = (
+				A45109402E904FEE00E4AE05 /* .gitignore */,
 				A45109142E904C7E00E4AE05 /* CoinStreak */,
 				A45109262E904C7F00E4AE05 /* CoinStreakTests */,
 				A45109302E904C7F00E4AE05 /* CoinStreakUITests */,
@@ -212,6 +218,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A45109412E904FF700E4AE05 /* .gitignore in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
