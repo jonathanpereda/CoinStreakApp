@@ -1,0 +1,546 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		A45109242E904C7F00E4AE05 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A451090A2E904C7D00E4AE05 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A45109112E904C7E00E4AE05;
+			remoteInfo = CoinStreak;
+		};
+		A451092E2E904C7F00E4AE05 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A451090A2E904C7D00E4AE05 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A45109112E904C7E00E4AE05;
+			remoteInfo = CoinStreak;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		A45109122E904C7E00E4AE05 /* CoinStreak.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CoinStreak.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A45109232E904C7F00E4AE05 /* CoinStreakTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CoinStreakTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A451092D2E904C7F00E4AE05 /* CoinStreakUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CoinStreakUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A45109142E904C7E00E4AE05 /* CoinStreak */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CoinStreak;
+			sourceTree = "<group>";
+		};
+		A45109262E904C7F00E4AE05 /* CoinStreakTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CoinStreakTests;
+			sourceTree = "<group>";
+		};
+		A45109302E904C7F00E4AE05 /* CoinStreakUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CoinStreakUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A451090F2E904C7E00E4AE05 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A45109202E904C7F00E4AE05 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A451092A2E904C7F00E4AE05 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A45109092E904C7D00E4AE05 = {
+			isa = PBXGroup;
+			children = (
+				A45109142E904C7E00E4AE05 /* CoinStreak */,
+				A45109262E904C7F00E4AE05 /* CoinStreakTests */,
+				A45109302E904C7F00E4AE05 /* CoinStreakUITests */,
+				A45109132E904C7E00E4AE05 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A45109132E904C7E00E4AE05 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A45109122E904C7E00E4AE05 /* CoinStreak.app */,
+				A45109232E904C7F00E4AE05 /* CoinStreakTests.xctest */,
+				A451092D2E904C7F00E4AE05 /* CoinStreakUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A45109112E904C7E00E4AE05 /* CoinStreak */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A45109372E904C7F00E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreak" */;
+			buildPhases = (
+				A451090E2E904C7E00E4AE05 /* Sources */,
+				A451090F2E904C7E00E4AE05 /* Frameworks */,
+				A45109102E904C7E00E4AE05 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A45109142E904C7E00E4AE05 /* CoinStreak */,
+			);
+			name = CoinStreak;
+			packageProductDependencies = (
+			);
+			productName = CoinStreak;
+			productReference = A45109122E904C7E00E4AE05 /* CoinStreak.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A45109222E904C7F00E4AE05 /* CoinStreakTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A451093A2E904C7F00E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreakTests" */;
+			buildPhases = (
+				A451091F2E904C7F00E4AE05 /* Sources */,
+				A45109202E904C7F00E4AE05 /* Frameworks */,
+				A45109212E904C7F00E4AE05 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A45109252E904C7F00E4AE05 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A45109262E904C7F00E4AE05 /* CoinStreakTests */,
+			);
+			name = CoinStreakTests;
+			packageProductDependencies = (
+			);
+			productName = CoinStreakTests;
+			productReference = A45109232E904C7F00E4AE05 /* CoinStreakTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A451092C2E904C7F00E4AE05 /* CoinStreakUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A451093D2E904C7F00E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreakUITests" */;
+			buildPhases = (
+				A45109292E904C7F00E4AE05 /* Sources */,
+				A451092A2E904C7F00E4AE05 /* Frameworks */,
+				A451092B2E904C7F00E4AE05 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A451092F2E904C7F00E4AE05 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A45109302E904C7F00E4AE05 /* CoinStreakUITests */,
+			);
+			name = CoinStreakUITests;
+			packageProductDependencies = (
+			);
+			productName = CoinStreakUITests;
+			productReference = A451092D2E904C7F00E4AE05 /* CoinStreakUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A451090A2E904C7D00E4AE05 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					A45109112E904C7E00E4AE05 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					A45109222E904C7F00E4AE05 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A45109112E904C7E00E4AE05;
+					};
+					A451092C2E904C7F00E4AE05 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A45109112E904C7E00E4AE05;
+					};
+				};
+			};
+			buildConfigurationList = A451090D2E904C7D00E4AE05 /* Build configuration list for PBXProject "CoinStreak" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A45109092E904C7D00E4AE05;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A45109132E904C7E00E4AE05 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A45109112E904C7E00E4AE05 /* CoinStreak */,
+				A45109222E904C7F00E4AE05 /* CoinStreakTests */,
+				A451092C2E904C7F00E4AE05 /* CoinStreakUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A45109102E904C7E00E4AE05 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A45109212E904C7F00E4AE05 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A451092B2E904C7F00E4AE05 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A451090E2E904C7E00E4AE05 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A451091F2E904C7F00E4AE05 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A45109292E904C7F00E4AE05 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A45109252E904C7F00E4AE05 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A45109112E904C7E00E4AE05 /* CoinStreak */;
+			targetProxy = A45109242E904C7F00E4AE05 /* PBXContainerItemProxy */;
+		};
+		A451092F2E904C7F00E4AE05 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A45109112E904C7E00E4AE05 /* CoinStreak */;
+			targetProxy = A451092E2E904C7F00E4AE05 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		A45109352E904C7F00E4AE05 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A45109362E904C7F00E4AE05 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		A45109382E904C7F00E4AE05 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = CoinStreak/CoinStreak.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"CoinStreak/Preview Content\"";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = HorizonRidge.CoinStreak;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A45109392E904C7F00E4AE05 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = CoinStreak/CoinStreak.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"CoinStreak/Preview Content\"";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = HorizonRidge.CoinStreak;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A451093B2E904C7F00E4AE05 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = HorizonRidge.CoinStreakTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoinStreak.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoinStreak";
+			};
+			name = Debug;
+		};
+		A451093C2E904C7F00E4AE05 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = HorizonRidge.CoinStreakTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoinStreak.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoinStreak";
+			};
+			name = Release;
+		};
+		A451093E2E904C7F00E4AE05 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = HorizonRidge.CoinStreakUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = CoinStreak;
+			};
+			name = Debug;
+		};
+		A451093F2E904C7F00E4AE05 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = HorizonRidge.CoinStreakUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = CoinStreak;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A451090D2E904C7D00E4AE05 /* Build configuration list for PBXProject "CoinStreak" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A45109352E904C7F00E4AE05 /* Debug */,
+				A45109362E904C7F00E4AE05 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A45109372E904C7F00E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreak" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A45109382E904C7F00E4AE05 /* Debug */,
+				A45109392E904C7F00E4AE05 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A451093A2E904C7F00E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreakTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A451093B2E904C7F00E4AE05 /* Debug */,
+				A451093C2E904C7F00E4AE05 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A451093D2E904C7F00E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreakUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A451093E2E904C7F00E4AE05 /* Debug */,
+				A451093F2E904C7F00E4AE05 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A451090A2E904C7D00E4AE05 /* Project object */;
+}
