@@ -1,13 +1,13 @@
 //
-//  CoinStreakUITestsLaunchTests.swift
-//  CoinStreakUITests
+//  CoinStreak_IOSUITestsLaunchTests.swift
+//  CoinStreak IOSUITests
 //
 //  Created by Jonathan Pereda on 10/3/25.
 //
 
 import XCTest
 
-final class CoinStreakUITestsLaunchTests: XCTestCase {
+final class CoinStreak_IOSUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

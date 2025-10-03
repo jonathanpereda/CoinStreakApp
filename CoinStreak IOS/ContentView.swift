@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  CoinStreak
+//  CoinStreak IOS
 //
 //  Created by Jonathan Pereda on 10/3/25.
 //

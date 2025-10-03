@@ -6,68 +6,64 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		A45109412E904FF700E4AE05 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = A45109402E904FEE00E4AE05 /* .gitignore */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
-		A45109242E904C7F00E4AE05 /* PBXContainerItemProxy */ = {
+		A45109562E90546100E4AE05 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A451090A2E904C7D00E4AE05 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = A45109112E904C7E00E4AE05;
-			remoteInfo = CoinStreak;
+			remoteGlobalIDString = A45109452E90546000E4AE05;
+			remoteInfo = "CoinStreak IOS";
 		};
-		A451092E2E904C7F00E4AE05 /* PBXContainerItemProxy */ = {
+		A45109602E90546100E4AE05 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A451090A2E904C7D00E4AE05 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = A45109112E904C7E00E4AE05;
-			remoteInfo = CoinStreak;
+			remoteGlobalIDString = A45109452E90546000E4AE05;
+			remoteInfo = "CoinStreak IOS";
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A45109122E904C7E00E4AE05 /* CoinStreak.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CoinStreak.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A45109232E904C7F00E4AE05 /* CoinStreakTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CoinStreakTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A451092D2E904C7F00E4AE05 /* CoinStreakUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CoinStreakUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A45109402E904FEE00E4AE05 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		A45109462E90546000E4AE05 /* CoinStreak IOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CoinStreak IOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A45109552E90546100E4AE05 /* CoinStreak IOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CoinStreak IOSTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A451095F2E90546100E4AE05 /* CoinStreak IOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CoinStreak IOSUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A45109142E904C7E00E4AE05 /* CoinStreak */ = {
+		A45109472E90546000E4AE05 /* CoinStreak IOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = CoinStreak;
+			path = "CoinStreak IOS";
 			sourceTree = "<group>";
 		};
-		A45109262E904C7F00E4AE05 /* CoinStreakTests */ = {
+		A45109582E90546100E4AE05 /* CoinStreak IOSTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = CoinStreakTests;
+			path = "CoinStreak IOSTests";
 			sourceTree = "<group>";
 		};
-		A45109302E904C7F00E4AE05 /* CoinStreakUITests */ = {
+		A45109622E90546100E4AE05 /* CoinStreak IOSUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = CoinStreakUITests;
+			path = "CoinStreak IOSUITests";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		A451090F2E904C7E00E4AE05 /* Frameworks */ = {
+		A45109432E90546000E4AE05 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A45109202E904C7F00E4AE05 /* Frameworks */ = {
+		A45109522E90546100E4AE05 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A451092A2E904C7F00E4AE05 /* Frameworks */ = {
+		A451095C2E90546100E4AE05 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -81,9 +77,9 @@
 			isa = PBXGroup;
 			children = (
 				A45109402E904FEE00E4AE05 /* .gitignore */,
-				A45109142E904C7E00E4AE05 /* CoinStreak */,
-				A45109262E904C7F00E4AE05 /* CoinStreakTests */,
-				A45109302E904C7F00E4AE05 /* CoinStreakUITests */,
+				A45109472E90546000E4AE05 /* CoinStreak IOS */,
+				A45109582E90546100E4AE05 /* CoinStreak IOSTests */,
+				A45109622E90546100E4AE05 /* CoinStreak IOSUITests */,
 				A45109132E904C7E00E4AE05 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -91,9 +87,9 @@
 		A45109132E904C7E00E4AE05 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A45109122E904C7E00E4AE05 /* CoinStreak.app */,
-				A45109232E904C7F00E4AE05 /* CoinStreakTests.xctest */,
-				A451092D2E904C7F00E4AE05 /* CoinStreakUITests.xctest */,
+				A45109462E90546000E4AE05 /* CoinStreak IOS.app */,
+				A45109552E90546100E4AE05 /* CoinStreak IOSTests.xctest */,
+				A451095F2E90546100E4AE05 /* CoinStreak IOSUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -101,72 +97,72 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A45109112E904C7E00E4AE05 /* CoinStreak */ = {
+		A45109452E90546000E4AE05 /* CoinStreak IOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A45109372E904C7F00E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreak" */;
+			buildConfigurationList = A45109672E90546100E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreak IOS" */;
 			buildPhases = (
-				A451090E2E904C7E00E4AE05 /* Sources */,
-				A451090F2E904C7E00E4AE05 /* Frameworks */,
-				A45109102E904C7E00E4AE05 /* Resources */,
+				A45109422E90546000E4AE05 /* Sources */,
+				A45109432E90546000E4AE05 /* Frameworks */,
+				A45109442E90546000E4AE05 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				A45109142E904C7E00E4AE05 /* CoinStreak */,
+				A45109472E90546000E4AE05 /* CoinStreak IOS */,
 			);
-			name = CoinStreak;
+			name = "CoinStreak IOS";
 			packageProductDependencies = (
 			);
-			productName = CoinStreak;
-			productReference = A45109122E904C7E00E4AE05 /* CoinStreak.app */;
+			productName = "CoinStreak IOS";
+			productReference = A45109462E90546000E4AE05 /* CoinStreak IOS.app */;
 			productType = "com.apple.product-type.application";
 		};
-		A45109222E904C7F00E4AE05 /* CoinStreakTests */ = {
+		A45109542E90546100E4AE05 /* CoinStreak IOSTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A451093A2E904C7F00E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreakTests" */;
+			buildConfigurationList = A451096A2E90546100E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreak IOSTests" */;
 			buildPhases = (
-				A451091F2E904C7F00E4AE05 /* Sources */,
-				A45109202E904C7F00E4AE05 /* Frameworks */,
-				A45109212E904C7F00E4AE05 /* Resources */,
+				A45109512E90546100E4AE05 /* Sources */,
+				A45109522E90546100E4AE05 /* Frameworks */,
+				A45109532E90546100E4AE05 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				A45109252E904C7F00E4AE05 /* PBXTargetDependency */,
+				A45109572E90546100E4AE05 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				A45109262E904C7F00E4AE05 /* CoinStreakTests */,
+				A45109582E90546100E4AE05 /* CoinStreak IOSTests */,
 			);
-			name = CoinStreakTests;
+			name = "CoinStreak IOSTests";
 			packageProductDependencies = (
 			);
-			productName = CoinStreakTests;
-			productReference = A45109232E904C7F00E4AE05 /* CoinStreakTests.xctest */;
+			productName = "CoinStreak IOSTests";
+			productReference = A45109552E90546100E4AE05 /* CoinStreak IOSTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		A451092C2E904C7F00E4AE05 /* CoinStreakUITests */ = {
+		A451095E2E90546100E4AE05 /* CoinStreak IOSUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A451093D2E904C7F00E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreakUITests" */;
+			buildConfigurationList = A451096D2E90546100E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreak IOSUITests" */;
 			buildPhases = (
-				A45109292E904C7F00E4AE05 /* Sources */,
-				A451092A2E904C7F00E4AE05 /* Frameworks */,
-				A451092B2E904C7F00E4AE05 /* Resources */,
+				A451095B2E90546100E4AE05 /* Sources */,
+				A451095C2E90546100E4AE05 /* Frameworks */,
+				A451095D2E90546100E4AE05 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				A451092F2E904C7F00E4AE05 /* PBXTargetDependency */,
+				A45109612E90546100E4AE05 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				A45109302E904C7F00E4AE05 /* CoinStreakUITests */,
+				A45109622E90546100E4AE05 /* CoinStreak IOSUITests */,
 			);
-			name = CoinStreakUITests;
+			name = "CoinStreak IOSUITests";
 			packageProductDependencies = (
 			);
-			productName = CoinStreakUITests;
-			productReference = A451092D2E904C7F00E4AE05 /* CoinStreakUITests.xctest */;
+			productName = "CoinStreak IOSUITests";
+			productReference = A451095F2E90546100E4AE05 /* CoinStreak IOSUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -179,16 +175,16 @@
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
-					A45109112E904C7E00E4AE05 = {
+					A45109452E90546000E4AE05 = {
 						CreatedOnToolsVersion = 16.0;
 					};
-					A45109222E904C7F00E4AE05 = {
+					A45109542E90546100E4AE05 = {
 						CreatedOnToolsVersion = 16.0;
-						TestTargetID = A45109112E904C7E00E4AE05;
+						TestTargetID = A45109452E90546000E4AE05;
 					};
-					A451092C2E904C7F00E4AE05 = {
+					A451095E2E90546100E4AE05 = {
 						CreatedOnToolsVersion = 16.0;
-						TestTargetID = A45109112E904C7E00E4AE05;
+						TestTargetID = A45109452E90546000E4AE05;
 					};
 				};
 			};
@@ -206,30 +202,29 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A45109112E904C7E00E4AE05 /* CoinStreak */,
-				A45109222E904C7F00E4AE05 /* CoinStreakTests */,
-				A451092C2E904C7F00E4AE05 /* CoinStreakUITests */,
+				A45109452E90546000E4AE05 /* CoinStreak IOS */,
+				A45109542E90546100E4AE05 /* CoinStreak IOSTests */,
+				A451095E2E90546100E4AE05 /* CoinStreak IOSUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A45109102E904C7E00E4AE05 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				A45109412E904FF700E4AE05 /* .gitignore in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		A45109212E904C7F00E4AE05 /* Resources */ = {
+		A45109442E90546000E4AE05 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A451092B2E904C7F00E4AE05 /* Resources */ = {
+		A45109532E90546100E4AE05 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A451095D2E90546100E4AE05 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -239,21 +234,21 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A451090E2E904C7E00E4AE05 /* Sources */ = {
+		A45109422E90546000E4AE05 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A451091F2E904C7F00E4AE05 /* Sources */ = {
+		A45109512E90546100E4AE05 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A45109292E904C7F00E4AE05 /* Sources */ = {
+		A451095B2E90546100E4AE05 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -263,15 +258,15 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		A45109252E904C7F00E4AE05 /* PBXTargetDependency */ = {
+		A45109572E90546100E4AE05 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = A45109112E904C7E00E4AE05 /* CoinStreak */;
-			targetProxy = A45109242E904C7F00E4AE05 /* PBXContainerItemProxy */;
+			target = A45109452E90546000E4AE05 /* CoinStreak IOS */;
+			targetProxy = A45109562E90546100E4AE05 /* PBXContainerItemProxy */;
 		};
-		A451092F2E904C7F00E4AE05 /* PBXTargetDependency */ = {
+		A45109612E90546100E4AE05 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = A45109112E904C7E00E4AE05 /* CoinStreak */;
-			targetProxy = A451092E2E904C7F00E4AE05 /* PBXContainerItemProxy */;
+			target = A45109452E90546000E4AE05 /* CoinStreak IOS */;
+			targetProxy = A45109602E90546100E4AE05 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -394,117 +389,140 @@
 			};
 			name = Release;
 		};
-		A45109382E904C7F00E4AE05 /* Debug */ = {
+		A45109682E90546100E4AE05 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = CoinStreak/CoinStreak.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"CoinStreak/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"CoinStreak IOS/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
-					"@executable_path/../Frameworks",
+					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = HorizonRidge.CoinStreak;
+				PRODUCT_BUNDLE_IDENTIFIER = "HorizonRidge.CoinStreak-IOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
-		A45109392E904C7F00E4AE05 /* Release */ = {
+		A45109692E90546100E4AE05 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = CoinStreak/CoinStreak.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"CoinStreak/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"CoinStreak IOS/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
-					"@executable_path/../Frameworks",
+					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = HorizonRidge.CoinStreak;
+				PRODUCT_BUNDLE_IDENTIFIER = "HorizonRidge.CoinStreak-IOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
-		A451093B2E904C7F00E4AE05 /* Debug */ = {
+		A451096B2E90546100E4AE05 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = HorizonRidge.CoinStreakTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "HorizonRidge.CoinStreak-IOSTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoinStreak.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoinStreak";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoinStreak IOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoinStreak IOS";
 			};
 			name = Debug;
 		};
-		A451093C2E904C7F00E4AE05 /* Release */ = {
+		A451096C2E90546100E4AE05 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = HorizonRidge.CoinStreakTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "HorizonRidge.CoinStreak-IOSTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoinStreak.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoinStreak";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoinStreak IOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoinStreak IOS";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
-		A451093E2E904C7F00E4AE05 /* Debug */ = {
+		A451096E2E90546100E4AE05 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = HorizonRidge.CoinStreakUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = "HorizonRidge.CoinStreak-IOSUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = CoinStreak;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "CoinStreak IOS";
 			};
 			name = Debug;
 		};
-		A451093F2E904C7F00E4AE05 /* Release */ = {
+		A451096F2E90546100E4AE05 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = HorizonRidge.CoinStreakUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = "HorizonRidge.CoinStreak-IOSUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = CoinStreak;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "CoinStreak IOS";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
@@ -520,29 +538,29 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A45109372E904C7F00E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreak" */ = {
+		A45109672E90546100E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreak IOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A45109382E904C7F00E4AE05 /* Debug */,
-				A45109392E904C7F00E4AE05 /* Release */,
+				A45109682E90546100E4AE05 /* Debug */,
+				A45109692E90546100E4AE05 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A451093A2E904C7F00E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreakTests" */ = {
+		A451096A2E90546100E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreak IOSTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A451093B2E904C7F00E4AE05 /* Debug */,
-				A451093C2E904C7F00E4AE05 /* Release */,
+				A451096B2E90546100E4AE05 /* Debug */,
+				A451096C2E90546100E4AE05 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A451093D2E904C7F00E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreakUITests" */ = {
+		A451096D2E90546100E4AE05 /* Build configuration list for PBXNativeTarget "CoinStreak IOSUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A451093E2E904C7F00E4AE05 /* Debug */,
-				A451093F2E904C7F00E4AE05 /* Release */,
+				A451096E2E90546100E4AE05 /* Debug */,
+				A451096F2E90546100E4AE05 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

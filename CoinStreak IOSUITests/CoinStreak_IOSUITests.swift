@@ -1,13 +1,13 @@
 //
-//  CoinStreakUITests.swift
-//  CoinStreakUITests
+//  CoinStreak_IOSUITests.swift
+//  CoinStreak IOSUITests
 //
 //  Created by Jonathan Pereda on 10/3/25.
 //
 
 import XCTest
 
-final class CoinStreakUITests: XCTestCase {
+final class CoinStreak_IOSUITests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
