@@ -39,7 +39,11 @@ struct FlippingCoin: View, Animatable {
 
         let rad = a * .pi / 180
         let mag = seeingBack ? backScale : 1
-        let signedTilt: CGFloat = tiltMag * mag * CGFloat(cos(rad))
+        
+        // NEW: zero tilt at rest (a ≈ 0 or 180), max around mid-flight.
+        // Also clamp tiny values so we don’t see a micro skew.
+        var signedTilt: CGFloat = tiltMag * mag * CGFloat(sin(rad))
+        if abs(signedTilt) < 0.001 { signedTilt = 0 }   // snap truly flat at rest
 
         let vx = signedTilt, vy: CGFloat = 1
         let len = sqrt(vx*vx + vy*vy)
@@ -52,15 +56,87 @@ struct FlippingCoin: View, Animatable {
             .frame(width: width)
             .compositingGroup()
             .scaleEffect(x: flipX, y: 1, anchor: .center)
-            .rotation3DEffect(.degrees(pitchX), axis: (x: 1, y: 0, z: 0), anchor: .center)
+            .rotation3DEffect(.degrees(pitchX),
+                              axis: (x: 1, y: 0, z: 0),
+                              anchor: .center,
+                              perspective: perspective)          // ← was default (nonzero)
+
             .rotation3DEffect(.degrees(a),
                               axis: (x: ax, y: ay, z: 0),
                               anchor: .center,
-                              perspective: perspective)
+                              perspective: perspective)          // ← was 0.51
             .position(position)
             .animation(nil, value: face)
     }
 }
+
+// t: 0 → 1
+private func settleAnglesSide(_ t: Double) -> (xRock: Double, yRock: Double) {
+    // Slower decay and clear side tilt
+    let decay: Double = 6.8
+    let e = exp(-decay * t)
+
+    let yAmp: Double = 30.0   // ← dominant: left/right tilt (Y axis)
+    let xAmp: Double = 2.0    // ← subtle front/back (X axis) so it doesn’t look flat
+
+    // Slight detune + phase gives natural feel
+    let y = yAmp * sin(2 * Double.pi * 3.0 * t + Double.pi/4) * e
+    let x = xAmp * sin(2 * Double.pi * 3.4 * t) * e
+    return (x, y)
+}
+
+
+
+private struct SettleWiggle: AnimatableModifier {
+    var t: Double
+    var animatableData: Double {
+        get { t }
+        set { t = newValue }
+    }
+    func body(content: Content) -> some View {
+        let ang = settleAnglesSide(t)   // your (xRock, yRock)
+        content
+            // subtle front/back
+            .rotation3DEffect(.degrees(ang.xRock),
+                              axis: (x: 1, y: 0, z: 0),
+                              anchor: .bottom,
+                              perspective: 0.45)  // ← add perspective here
+            // dominant left/right rock
+            .rotation3DEffect(.degrees(ang.yRock),
+                              axis: (x: 0, y: 1, z: 0),
+                              anchor: .bottom,
+                              perspective: 0.45)  // ← and here
+    }
+}
+
+
+
+private func bounceY(_ t: Double) -> Double {
+    // t: 0→1; return NEGATIVE (upwards) pixels; 0 = rest
+    // Using |sin| so each lobe is an “upward tap”, then back to 0.
+    let decay = 6.5         // larger = dies faster
+    let freq  = 3.0         // ~3 taps across t∈[0,1]
+    let amp   = 10.0        // max height in px for first tap
+
+    let envelope = exp(-decay * t)
+    let pulses   = abs(sin(2 * Double.pi * freq * t))  // 0→1→0 lobes
+    return -(amp * envelope * pulses)                  // negative y = up
+}
+
+private struct SettleBounce: AnimatableModifier {
+    var t: Double                        // 0→1
+    var animatableData: Double {
+        get { t }
+        set { t = newValue }
+    }
+    func body(content: Content) -> some View {
+        content.offset(y: CGFloat(bounceY(t)))
+    }
+}
+
+
+
+
 
 private func streakColor(_ v: Int) -> Color {
     switch v {
@@ -202,6 +278,10 @@ struct ContentView: View {
     @State private var baseFaceAtLaunch = "Heads"
     @State private var flightAngle: Double = 0
     @State private var flightTarget: Double = 0
+    @State private var settleT: Double = 1.0   // 1 = idle (no wobble), we animate 0 -> 1 on land
+    @State private var bounceGen: Int = 0   // cancels any in-flight bounce sequence
+    @State private var settleBounceT: Double = 1.0   // 0→1 drives bounce curve; 1 = idle
+
 
     // App phase
     @State private var phase: AppPhase = .choosing
@@ -261,15 +341,20 @@ struct ContentView: View {
                         .position(x: W/2, y: shadowY_centerLocked)
 
                     // Coin
-                    FlippingCoin(angle: flightAngle,
-                                 targetAngle: flightTarget,
-                                 baseFace: baseFaceAtLaunch,
-                                 width: coinD,
-                                 position: .init(x: W/2, y: coinCenterY))
-                        .offset(y: y)
-                        .scaleEffect(scale)
-                        .contentShape(Rectangle())
-                        .onTapGesture { flipCoin() }
+                    ZStack {
+                        FlippingCoin(angle: flightAngle,
+                                     targetAngle: flightTarget,
+                                     baseFace: baseFaceAtLaunch,
+                                     width: coinD,
+                                     position: .init(x: W/2, y: coinCenterY))
+                            .offset(y: y + CGFloat(bounceY(settleBounceT)))   // ← flight + bounce together
+                            .scaleEffect(scale)
+                    }
+                    .modifier(SettleWiggle(t: settleT))       // apply to parent, not inside coin’s 3D perspective
+                    .modifier(SettleBounce(t: settleBounceT)) // ditto
+                    .contentShape(Rectangle())
+                    .onTapGesture { flipCoin() }
+
                 }
                 .opacity(gameplayOpacity)                 // <— no animation; see onReveal below
                 .allowsHitTesting(phase == .playing)      // disable taps until playing
@@ -440,11 +525,66 @@ struct ContentView: View {
         }
 
     }
+    
+    
+    private func runReboundBounces() {
+        // Increment generation to invalidate any earlier scheduled steps
+        bounceGen &+= 1
+        let gen = bounceGen
+
+        // Tunables
+        let amps: [CGFloat] = [-10, -6, -3]    // pixels up (negative y = up)
+        let upResp:  Double = 0.12
+        let upDamp:  Double = 0.62
+        let dnResp:  Double = 0.16
+        let dnDamp:  Double = 0.88
+
+        // Total timing accumulator
+        var t: Double = 0
+
+        func schedule(_ delay: Double, _ block: @escaping () -> Void) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard gen == bounceGen else { return }  // canceled by new flip
+                block()
+            }
+        }
+
+        for i in 0..<amps.count {
+            let a = amps[i]
+
+            // Up tick
+            schedule(t) {
+                withAnimation(.spring(response: upResp, dampingFraction: upDamp)) {
+                    y = a
+                }
+            }
+            t += upResp * 0.85  // begin coming down slightly before the up spring fully settles
+
+            // Down to rest
+            schedule(t) {
+                withAnimation(.spring(response: dnResp, dampingFraction: dnDamp)) {
+                    y = 0
+                }
+            }
+            t += dnResp * 0.95
+        }
+    }
+
 
     // MARK: - Flip logic
     func flipCoin() {
         guard phase == .playing else { return }   // block until pre-roll done
         guard !isFlipping else { return }
+        
+        // Cancel any ongoing bounce/wobble and reset pose instantly
+        withTransaction(.init(animation: nil)) {
+            settleBounceT = 1.0
+            settleT = 1.0
+            y = 0
+        }
+
+
+
         
         // Random launch sound
         SoundManager.shared.play(["launch_1","launch_2"].randomElement()!)
@@ -494,7 +634,22 @@ struct ContentView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + total) {
             curState = desired
             
-            
+            // 1) freeze flip state (prevents drift)
+            let noAnim = Transaction(animation: nil)
+            withTransaction(noAnim) {
+                baseFaceAtLaunch = desired
+                isFlipping = false
+                flightAngle = 0
+                flightTarget = 0
+            }
+
+            // Kick off bounce + wobble once
+            settleBounceT = 0.0
+            withAnimation(.linear(duration: 0.70)) { settleBounceT = 1.0 }
+
+            settleT = 0.0
+            withAnimation(.linear(duration: 0.85)) { settleT = 1.0 }
+
             
             if let faceVal = Face(rawValue: desired) {
                 store.recordFlip(result: faceVal)
@@ -512,10 +667,6 @@ struct ContentView: View {
                     SoundManager.shared.play(["land_1","land_2"].randomElement()!)
                 }
             }
-            baseFaceAtLaunch = desired
-            isFlipping = false
-            flightAngle = 0
-            flightTarget = 0
         }
     }
 }
