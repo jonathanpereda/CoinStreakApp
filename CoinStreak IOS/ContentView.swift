@@ -7,13 +7,14 @@
 
 import SwiftUI
 
+// MARK: - App Phases
+private enum AppPhase { case choosing, preRoll, playing }
 
 // MARK: - Animatable coin that swaps face based on the live angle
 struct FlippingCoin: View, Animatable {
-    // SwiftUI interpolates this every frame
-    var angle: Double                 // 0 → targetAngle during flight
-    var targetAngle: Double           // (kept for completeness; not used here)
-    var baseFace: String              // "Heads" at takeoff (or "Tails")
+    var angle: Double
+    var targetAngle: Double
+    var baseFace: String
     var width: CGFloat
     var position: CGPoint
 
@@ -25,28 +26,21 @@ struct FlippingCoin: View, Animatable {
     private func flipped(_ s: String) -> String { s == "Heads" ? "Tails" : "Heads" }
     private func imageName(for face: String) -> String { face == "Tails" ? "coin_tails" : "coin_heads" }
 
-    private let tiltMag: CGFloat = 0.20      // base axis tilt magnitude
-    private let backScale: CGFloat = 0.14    // ↓ reduce tilt on back half (90°–270°)
-    private let pitchX: Double = -6          // fixed camera pitch (top slightly away)
-    private let perspective: CGFloat = 0.51  // 0.5–0.7 looks natural
+    private let tiltMag: CGFloat = 0.20
+    private let backScale: CGFloat = 0.14
+    private let pitchX: Double = -6
+    private let perspective: CGFloat = 0.51
 
     var body: some View {
-        // Normalize to [0, 360)
-        let a = (angle.truncatingRemainder(dividingBy: 360) + 360)
-                .truncatingRemainder(dividingBy: 360)
-
-        // Back side visible between 90° and <270° → swap face + flip bitmap
+        let a = (angle.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
         let seeingBack = (a >= 90 && a < 270)
         let face = seeingBack ? flipped(baseFace) : baseFace
         let flipX: CGFloat = seeingBack ? -1 : 1
 
-        // --- Signed axis tilt with attenuation on the back half ---
-        // cos(a) gives + on 0–90, − on 90–270, + on 270–360 (smooth sign flip)
         let rad = a * .pi / 180
-        let mag = seeingBack ? backScale : 1        // attenuate only on the back
+        let mag = seeingBack ? backScale : 1
         let signedTilt: CGFloat = tiltMag * mag * CGFloat(cos(rad))
 
-        // Normalize axis (critical)
         let vx = signedTilt, vy: CGFloat = 1
         let len = sqrt(vx*vx + vy*vy)
         let ax = vx / max(len, 0.0001), ay = vy / max(len, 0.0001)
@@ -57,129 +51,119 @@ struct FlippingCoin: View, Animatable {
             .aspectRatio(contentMode: .fit)
             .frame(width: width)
             .compositingGroup()
-
-            // Prevent mirrored look when back is showing
             .scaleEffect(x: flipX, y: 1, anchor: .center)
-
-            // Fixed camera pitch (keep consistent with your artwork perspective)
             .rotation3DEffect(.degrees(pitchX), axis: (x: 1, y: 0, z: 0), anchor: .center)
-
-            // Main rotation around normalized, sign-flipping axis (center pivot)
             .rotation3DEffect(.degrees(a),
                               axis: (x: ax, y: ay, z: 0),
                               anchor: .center,
                               perspective: perspective)
-
-            // Position AFTER rotations so the pivot stays at the coin’s center
             .position(position)
-
-            // Hard swap on face change (no cross-fade)
             .animation(nil, value: face)
     }
 }
 
-
-
 struct ContentView: View {
-    
     @StateObject private var store = FlipStore()
-    
-    @State private var curState = "Heads";
-    
+
+    @State private var curState = "Heads"
+
     // animation state
     @State private var y: CGFloat = 0        // 0 = on ledge
     @State private var scale: CGFloat = 1.0
-    @State private var shadow: CGFloat = 12
-    
-    private let coinDiameterPct: CGFloat = 0.565   // coin diameter as % of screen width
-    private let ledgeTopYPct: CGFloat = 0.97      // ledge top as % of screen height
-    private let coinRestOverlapPct: CGFloat = 0.06// how much the coin overlaps “into” the ledge
 
+    // Layout
+    private let coinDiameterPct: CGFloat = 0.565
+    private let ledgeTopYPct: CGFloat = 0.97
+    private let coinRestOverlapPct: CGFloat = 0.06
+
+    // Flip state
     @State private var isFlipping = false
     @State private var baseFaceAtLaunch = "Heads"
     @State private var flightAngle: Double = 0
     @State private var flightTarget: Double = 0
-    
+
+    // App phase
+    @State private var phase: AppPhase = .choosing
+    @State private var gameplayOpacity: Double = 0   // 0 = hidden during pre-roll, 1 = visible
+
+
     var body: some View {
         GeometryReader { geo in
             let W = geo.size.width
             let H = geo.size.height
             let coinD = W * coinDiameterPct
             let coinR = coinD / 2
-            // center Y so the coin “sits” on the ledge line, with a bit of overlap
             let coinCenterY = H * ledgeTopYPct - coinR * (1 - coinRestOverlapPct)
-            
             let groundY = H * ledgeTopYPct
 
-            // How high the coin is (0 = on ground, 1 = apex)
+            // Shadow geometry for main coin (during gameplay)
             let jumpPx   = max(180, H * 0.32)
-            let height01 = max(0, min(1, -y / jumpPx))   // t
+            let height01 = max(0, min(1, -y / jumpPx))
 
-            // ---- Shadow geometry (rest vs apex) ----
-            // You already tuned these — keep your values here
-            let baseShadowW: CGFloat = coinD * 1.00      // width at rest
-            let minShadowW:  CGFloat = coinD * 0.40      // width at apex
+            let baseShadowW: CGFloat = coinD * 1.00
+            let minShadowW:  CGFloat = coinD * 0.40
 
-            let baseShadowH: CGFloat = coinD * 0.60      // height at rest  (your current value)
-            let minShadowH:  CGFloat = coinD * 0.22      // height at apex  (tweak to taste)
+            let baseShadowH: CGFloat = coinD * 0.60
+            let minShadowH:  CGFloat = coinD * 0.22
 
-            // If you want width to shrink more than height, you can bias t for height:
-            let heightShrinkBias: CGFloat = 0.75         // 0.0..1.0 (smaller = less shrink on height)
+            let heightShrinkBias: CGFloat = 0.75
             let th = min(1, height01 / max(heightShrinkBias, 0.0001))
 
-            // Linear interpolate
             let shadowW = baseShadowW + (minShadowW - baseShadowW) * height01
             let shadowHcur = baseShadowH + (minShadowH - baseShadowH) * th
 
-            // Visuals
             let shadowOpacity = 0.28 * (1.0 - 0.65 * height01)
             let shadowBlur    = 6.0 + 10.0 * height01
 
-            // Place ellipse center so its *top* sits on the ledge
-            let shadowYOffsetTweak: CGFloat = -157       // keep your tuned offset
+            let shadowYOffsetTweak: CGFloat = -157
             let shadowY_centerLocked = (groundY + baseShadowH / 2) + shadowYOffsetTweak
 
-            
-            
             ZStack {
-                Color.black.ignoresSafeArea() // fallback fill (prevents any gap)
+                Color.black.ignoresSafeArea() // fallback fill
                 Image("game_background")
                     .resizable()
                     .scaledToFill()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
                     .ignoresSafeArea()
-                
-                
-                Ellipse()
-                    .fill(Color.black.opacity(shadowOpacity))
-                    .frame(width: shadowW, height: shadowHcur)
-                    .blur(radius: shadowBlur)
-                    .position(x: W/2, y: shadowY_centerLocked)
-                
-                
-                FlippingCoin(angle: flightAngle,
-                             targetAngle: flightTarget,
-                             baseFace: baseFaceAtLaunch,
-                             width: coinD,
-                             position: .init(x: W/2, y: coinCenterY))
-                    .offset(y: y)
-                    .scaleEffect(scale)
-                    .contentShape(Rectangle())
-                    .onTapGesture { flipCoin()
-                        
+
+                // Gameplay shadow + coin are always in the tree; opacity gates visibility.
+                Group {
+                    // Shadow
+                    Ellipse()
+                        .fill(Color.black.opacity(shadowOpacity))
+                        .frame(width: shadowW, height: shadowHcur)
+                        .blur(radius: shadowBlur)
+                        .position(x: W/2, y: shadowY_centerLocked)
+
+                    // Coin
+                    FlippingCoin(angle: flightAngle,
+                                 targetAngle: flightTarget,
+                                 baseFace: baseFaceAtLaunch,
+                                 width: coinD,
+                                 position: .init(x: W/2, y: coinCenterY))
+                        .offset(y: y)
+                        .scaleEffect(scale)
+                        .contentShape(Rectangle())
+                        .onTapGesture { flipCoin() }
                 }
-                
+                .opacity(gameplayOpacity)                 // <— no animation; see onReveal below
+                .allowsHitTesting(phase == .playing)      // disable taps until playing
+
+
+
                 #if DEBUG
                 Button("DEV: Reset Choice") {
                     store.chosenFace = nil
                     store.currentStreak = 0
+                    phase = .choosing
+                    gameplayOpacity = 0
                 }
                 .padding(8)
                 .background(.red.opacity(0.2))
                 .cornerRadius(8)
                 #endif
-                
+
                 HStack{
                     Text("Streak: \(store.currentStreak)")
                         .font(.headline)
@@ -188,30 +172,76 @@ struct ContentView: View {
                         .cornerRadius(10)
                     Spacer()
                 }
-                
             }
             .ignoresSafeArea()
+
+            // Choose overlay
             .overlay {
-                if store.chosenFace == nil {
+                if phase == .choosing {
                     ChooseFaceScreen(
                         store: store,
-                        groundY: groundY,          // <- pass the actual ledge Y you use in the game
-                        screenSize: geo.size       // <- so the chooser uses the same W/H
-                    )
-                    .frame(width: geo.size.width, height: geo.size.height)  // lock to the same box
+                        groundY: groundY,
+                        screenSize: geo.size
+                    ) { selected in
+                        // Persist selection & make gameplay coin match it
+                        store.chosenFace     = selected
+                        curState             = selected.rawValue
+                        baseFaceAtLaunch     = selected.rawValue
+
+                        // Reset gameplay coin transforms just in case
+                        y = 0; scale = 1
+                        flightAngle = 0; flightTarget = 0
+
+                        // HIDE gameplay coin immediately (no animation) so it won't show before the drop
+                        let tx = Transaction(animation: nil)
+                        withTransaction(tx) { gameplayOpacity = 0 }
+
+                        // Start pre-roll
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            phase = .preRoll
+                        }
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
                     .ignoresSafeArea()
                     .transition(.opacity)
                     .zIndex(1000)
                 }
             }
 
-
+            // Pre-roll hero coin drop overlay
+            .overlay {
+                if phase == .preRoll {
+                    IntroOverlay(
+                        groundY: groundY,
+                        screenSize: geo.size,
+                        coinDiameterPct: coinDiameterPct,
+                        coinRestOverlapPct: coinRestOverlapPct,
+                        finalFace: store.chosenFace ?? .Heads,
+                        onRevealGameplay: {                     // called exactly at touchdown
+                            let tx = Transaction(animation: nil) // ensure no fade-in of gameplay coin
+                            withTransaction(tx) {
+                                gameplayOpacity = 1              // coin instantly visible UNDER overlay
+                            }
+                        },
+                        onFinished: {                            // overlay fade done -> start playing
+                            withAnimation(.easeInOut(duration: 0.20)) {
+                                phase = .playing
+                            }
+                        }
+                    )
+                    // No transition here—overlay manages its own fade
+                    .zIndex(999)
+                    .ignoresSafeArea()
+                }
+            }
 
 
         }
     }
+
     // MARK: - Flip logic
     func flipCoin() {
+        guard phase == .playing else { return }   // block until pre-roll done
         guard !isFlipping else { return }
 
         let desired = Bool.random() ? "Heads" : "Tails"
@@ -221,7 +251,7 @@ struct ContentView: View {
         isFlipping = true
 
         // Choose # of half-turns so final parity matches desired face
-        let needOdd = (desired != baseFaceAtLaunch)       // odd half-turns -> flip overall
+        let needOdd = (desired != baseFaceAtLaunch)
         let halfTurns = (needOdd ? [7, 9, 11] : [6, 8, 10]).randomElement()!
 
         // Timing & "gravity"
@@ -229,8 +259,7 @@ struct ContentView: View {
         let upDur = total * 0.38
         let downDur = total - upDur
         let jump: CGFloat = max(180, UIScreen.main.bounds.height * 0.32)
-        
-        
+
         flightAngle = 0
         flightTarget = Double(halfTurns) * 180
         withAnimation(.linear(duration: total)) {
@@ -241,18 +270,15 @@ struct ContentView: View {
         withAnimation(.easeOut(duration: upDur)) {
             y = -jump
             scale = 0.98
-            shadow = 3
         }
         // Down (ease-in)
         DispatchQueue.main.asyncAfter(deadline: .now() + upDur) {
             withAnimation(.easeIn(duration: downDur)) {
                 y = 0
                 scale = 1
-                shadow = 12
             }
             withAnimation(.easeOut(duration: 0.10)) {
-                // brief widen & darken
-                // (we can fake it by nudging y slightly negative & letting height01 = 0 react)
+                // small settle
             }
         }
 
@@ -260,7 +286,7 @@ struct ContentView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + total) {
             curState = desired
             if let faceVal = Face(rawValue: desired) {
-                    store.recordFlip(result: faceVal)
+                store.recordFlip(result: faceVal)
             }
             baseFaceAtLaunch = desired
             isFlipping = false
@@ -271,87 +297,114 @@ struct ContentView: View {
 }
 
 
-#if DEBUG
-import SwiftUI
+#Preview { ContentView() }
 
-struct CoinTiltBackScaleTuner: View {
-    @State private var angle: Double = 0                   // 0…360
-    @State private var tiltMag: CGFloat = 0.34             // base tilt magnitude
-    @State private var backScale: CGFloat = 0.86           // scale tilt on back (90–270)
-    @State private var pitchX: Double = -6                 // camera pitch
-    @State private var perspective: CGFloat = 0.60         // 0.45–0.8
-    private let demoWidth: CGFloat = 240
+// MARK: - Intro overlay (stronger mid-air tilt; no bounce; reveal gameplay at touchdown)
+private struct IntroOverlay: View {
+    let groundY: CGFloat
+    let screenSize: CGSize
+    let coinDiameterPct: CGFloat
+    let coinRestOverlapPct: CGFloat
+    let finalFace: Face
+    let onRevealGameplay: () -> Void
+    let onFinished: () -> Void
 
-    private func imageName(_ face: String) -> String { face == "Tails" ? "coin_tails" : "coin_heads" }
+    @State private var coinY: CGFloat = -600
+    @State private var shadowW: CGFloat = 0
+    @State private var shadowH: CGFloat = 0
+    @State private var shadowOpacity: CGFloat = 0
+    @State private var overlayOpacity: CGFloat = 1
+    @State private var angle: Double = -32          // stronger tilt
+    @State private var dropGroupOpacity: Double = 1
+    @State private var yaw: Double = -7
 
     var body: some View {
-        VStack(spacing: 18) {
-            // Normalize angle to [0, 360)
-            let a = (angle.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
-            let seeingBack = (a >= 90 && a < 270)
-            let face = seeingBack ? "Tails" : "Heads"
-            let flipX: CGFloat = seeingBack ? -1 : 1
+        let W = screenSize.width
+        let H = screenSize.height
+        let coinD = W * coinDiameterPct
+        let coinR = coinD / 2
 
-            // Signed tilt with attenuation on back half
-            let rad = a * .pi / 180
-            let mag = seeingBack ? backScale : 1
-            let signedTilt: CGFloat = tiltMag * mag * CGFloat(cos(rad))
+        let baseShadowW = coinD * 1.00
+        let minShadowW  = coinD * 0.40
+        let baseShadowH = coinD * 0.60
+        let minShadowH  = coinD * 0.22
+        let shadowYOffsetTweak: CGFloat = -157
+        let coinCenterY_atRest = groundY - coinR * (1 - coinRestOverlapPct)
 
-            // Normalize axis
-            let vx = signedTilt, vy: CGFloat = 1
-            let len = sqrt(vx*vx + vy*vy)
-            let ax = vx / max(len, 0.0001), ay = vy / max(len, 0.0001)
+        let faceImageName = (finalFace == .Tails) ? "coin_tails" : "coin_heads"
 
-            // Coin
-            Image(imageName(face))
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: demoWidth)
-                .scaleEffect(x: flipX, y: 1, anchor: .center)
-                .rotation3DEffect(.degrees(pitchX), axis: (x: 1, y: 0, z: 0), anchor: .center)
-                .rotation3DEffect(.degrees(a),
-                                  axis: (x: ax, y: ay, z: 0),
-                                  anchor: .center,
-                                  perspective: perspective)
-                .border(.gray.opacity(0.2))
+        ZStack {
+            Color.clear
 
-            // Controls
-            VStack(spacing: 10) {
-                Slider(value: $angle, in: 0...360) { Text("Angle") }
-                HStack {
-                    Text("Angle \(Int(angle))°"); Spacer()
-                }
-                HStack {
-                    Text("TiltMag \(String(format: "%.2f", tiltMag))")
-                    Slider(value: $tiltMag, in: 0.20...0.50)
-                }
-                HStack {
-                    Text("BackScale \(String(format: "%.2f", backScale))")
-                    Slider(value: $backScale, in: 0.75...1.00)
-                }
-                HStack {
-                    Text("Pitch \(Int(pitchX))°")
-                    Slider(value: $pitchX, in: -12...4)
-                }
-                HStack {
-                    Text("Perspective \(String(format: "%.2f", perspective))")
-                    Slider(value: $perspective, in: 0.45...0.80)
+            Group {
+                Ellipse()
+                    .fill(Color.black.opacity(shadowOpacity))
+                    .frame(width: shadowW, height: shadowH)
+                    .blur(radius: 8)
+                    .position(x: W/2, y: (groundY + baseShadowH / 2) + shadowYOffsetTweak)
+
+                Image(faceImageName)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: coinD)
+                    .rotationEffect(.degrees(angle))                               // 2D tilt
+                    .rotation3DEffect(.degrees(yaw), axis: (x: 0, y: 1, z: 0))     // NEW: subtle 3D yaw
+                    .position(x: W/2, y: coinCenterY_atRest + coinY)
+
+            }
+            .opacity(dropGroupOpacity)   // NEW: instantly hide overlay’s coin+shadow at touchdown
+        }
+        .opacity(overlayOpacity)
+        .onAppear {
+            // Start state
+            coinY = -max(700, H * 0.9)
+            shadowW = minShadowW
+            shadowH = minShadowH
+            shadowOpacity = 0.02
+            overlayOpacity = 1
+
+            angle = -32   // stronger 2D tilt
+            yaw   = -7    // subtle 3D yaw
+
+            // Timings
+            let dropDur: Double = 0.55
+
+            // (1) Vertical drop (no overshoot)
+            withAnimation(.easeIn(duration: dropDur)) {
+                coinY = 0
+                shadowW = baseShadowW
+                shadowH = baseShadowH
+                shadowOpacity = 0.28
+            }
+
+            // (2) Keep the coin noticeably tilted for a moment, then finish tilt IN AIR
+            // Hold tilt for ~0.12s, then straighten over ~0.38s so it completes just before touchdown.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                withAnimation(.easeOut(duration: 0.38)) {
+                    angle = 0
+                    yaw   = 0
                 }
             }
-            .padding(.horizontal)
+
+            // (3) Touchdown → instantly hide overlay’s coin/shadow, reveal gameplay coin, fade overlay
+            DispatchQueue.main.asyncAfter(deadline: .now() + dropDur) {
+                let tx = Transaction(animation: nil)
+                withTransaction(tx) { dropGroupOpacity = 0 }   // hide overlay coin+shadow instantly
+                withTransaction(tx) { onRevealGameplay() }     // show gameplay coin under overlay
+
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    overlayOpacity = 0
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+                    onFinished()
+                }
+            }
         }
-        .padding()
+        .allowsHitTesting(false)
     }
 }
 
-//#Preview { CoinTiltBackScaleTuner() }
-#endif
 
 
 
-
-
-
-#Preview {
-    ContentView()
-}
