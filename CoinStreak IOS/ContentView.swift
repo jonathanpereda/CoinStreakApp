@@ -62,6 +62,74 @@ struct FlippingCoin: View, Animatable {
     }
 }
 
+private func streakColor(_ v: Int) -> Color {
+    switch v {
+    case ...2:      return Color("#6E6E6E") // neutral gray
+    case 3...5:     return Color("#5B8BF7") // vibrant blue
+    case 6...8:     return Color("#00C2A8") // teal
+    case 9...10:    return Color("#7DDA58") // green
+    case 11...12:   return Color("#F7C948") // yellow/amber
+    case 13:        return Color("#FF8C00") // orange
+    case 14:        return Color("#E63946") // red
+    case 15:        return Color("#8A2BE2") // purple placeholder
+    case 16:        return Color("#8A2BE2")
+    case 17:        return Color("#8A2BE2")
+    case 18:        return Color("#8A2BE2")
+    case 19:        return Color("#8A2BE2")
+    default:        return Color("#8A2BE2") // 20+
+    }
+}
+
+@ViewBuilder
+private func streakNumberView(_ value: Int) -> some View {
+    let baseText =
+        Text("\(value)")
+            .font(.custom("Herculanum", size: 124))
+
+    if value >= 20 {
+        // Legendary tier: animated rainbow
+        RainbowText(text: baseText)
+    } else if (15...19).contains(value) {
+        // High tier: shimmer sweep
+        ShimmerText(text: baseText)
+    } else {
+        // Normal tiers: solid color ramp
+        baseText.foregroundColor(streakColor(value))
+    }
+}
+
+
+
+private struct StreakCounter: View {
+    let value: Int
+    @State private var pop: CGFloat = 1.0
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image("streak_text")
+                .resizable()
+                .interpolation(.high)
+                .antialiased(true)
+                .scaledToFit()
+                .scaleEffect(0.75)
+                .allowsHitTesting(false)
+
+            streakNumberView(value)
+                .shadow(radius: 10)
+                .scaleEffect(pop)
+                .animation(.spring(response: 0.22, dampingFraction: 0.55, blendDuration: 0.1), value: pop)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .onChange(of: value, initial: false) { oldValue, newValue in
+            pop = 1.18
+            DispatchQueue.main.async { pop = 1.0 }
+        }
+    }
+}
+
+
+
 struct ContentView: View {
     @StateObject private var store = FlipStore()
 
@@ -151,7 +219,6 @@ struct ContentView: View {
                 .allowsHitTesting(phase == .playing)      // disable taps until playing
 
 
-
                 #if DEBUG
                 Button("DEV: Reset Choice") {
                     store.chosenFace = nil
@@ -164,14 +231,18 @@ struct ContentView: View {
                 .cornerRadius(8)
                 #endif
 
-                HStack{
-                    Text("Streak: \(store.currentStreak)")
-                        .font(.headline)
-                        .padding(8)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(10)
+                // Top overlay: Streak Counter
+                VStack {
+                    if phase != .choosing {
+                        StreakCounter(value: store.currentStreak)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 75)
+                            .padding(.horizontal, 20)
+                            .transition(.opacity)
+                    }
                     Spacer()
                 }
+                .allowsHitTesting(false) // don't block coin taps
             }
             .ignoresSafeArea()
 
@@ -244,7 +315,8 @@ struct ContentView: View {
         guard phase == .playing else { return }   // block until pre-roll done
         guard !isFlipping else { return }
 
-        let desired = Bool.random() ? "Heads" : "Tails"
+        //let desired = Bool.random() ? "Heads" : "Tails"
+        let desired = "Heads"
 
         // Capture takeoff state
         baseFaceAtLaunch = curState

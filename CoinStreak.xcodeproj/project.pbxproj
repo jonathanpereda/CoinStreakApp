@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A4CB79FE2E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
+		A4CB79FF2E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
+		A4CB7A002E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A45109562E90546100E4AE05 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -28,6 +34,7 @@
 		A45109462E90546000E4AE05 /* CoinStreak IOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CoinStreak IOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A45109552E90546100E4AE05 /* CoinStreak IOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CoinStreak IOSTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A451095F2E90546100E4AE05 /* CoinStreak IOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CoinStreak IOSUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Herculanum.ttf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -76,6 +83,7 @@
 		A45109092E904C7D00E4AE05 = {
 			isa = PBXGroup;
 			children = (
+				A4CB79FC2E912FB500BCBFAE /* Fonts */,
 				A45109402E904FEE00E4AE05 /* .gitignore */,
 				A45109472E90546000E4AE05 /* CoinStreak IOS */,
 				A45109582E90546100E4AE05 /* CoinStreak IOSTests */,
@@ -92,6 +100,14 @@
 				A451095F2E90546100E4AE05 /* CoinStreak IOSUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A4CB79FC2E912FB500BCBFAE /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */,
+			);
+			path = Fonts;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -214,6 +230,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A4CB79FF2E91300E00BCBFAE /* Herculanum.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -221,6 +238,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A4CB79FE2E91300E00BCBFAE /* Herculanum.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -228,6 +246,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A4CB7A002E91300E00BCBFAE /* Herculanum.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -399,6 +418,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"CoinStreak IOS/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIAppFonts = Fonts/Herculanum.ttf;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -429,6 +449,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"CoinStreak IOS/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIAppFonts = Fonts/Herculanum.ttf;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
