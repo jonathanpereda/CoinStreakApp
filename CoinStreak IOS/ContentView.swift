@@ -9,13 +9,13 @@ import SwiftUI
 
 // MARK: - Animatable coin that swaps face based on the live angle
 struct FlippingCoin: View, Animatable {
-    // SwiftUI interpolates this every frame during animation
-    var angle: Double                     // flight angle: 0 → N*180
-    var baseFace: String                  // "Heads" at takeoff (or "Tails")
-    var width: CGFloat                    // rendered width of the coin
-    var position: CGPoint                 // center position on screen
+    // SwiftUI interpolates this every frame
+    var angle: Double                 // 0 → targetAngle during flight
+    var targetAngle: Double           // (kept for completeness; not used here)
+    var baseFace: String              // "Heads" at takeoff (or "Tails")
+    var width: CGFloat
+    var position: CGPoint
 
-    // Animatable conformance
     var animatableData: Double {
         get { angle }
         set { angle = newValue }
@@ -24,35 +24,61 @@ struct FlippingCoin: View, Animatable {
     private func flipped(_ s: String) -> String { s == "Heads" ? "Tails" : "Heads" }
     private func imageName(for face: String) -> String { face == "Tails" ? "coin_tails" : "coin_heads" }
 
+    // 🔧 Tune these three to match your art; start with these values
+    private let tiltMag: CGFloat = 0.24      // base axis tilt magnitude
+    private let backScale: CGFloat = 0.14    // ↓ reduce tilt on back half (90°–270°)
+    private let pitchX: Double = 2          // fixed camera pitch (top slightly away)
+    private let perspective: CGFloat = 0.51  // 0.5–0.7 looks natural
+
     var body: some View {
-        // Normalize 0..360
+        // Normalize to [0, 360)
         let a = (angle.truncatingRemainder(dividingBy: 360) + 360)
-                    .truncatingRemainder(dividingBy: 360)
+                .truncatingRemainder(dividingBy: 360)
 
-        // Face rule: show flipped from 90° up to 270° (back-facing half)
-        let showFlipped = (a >= 90 && a < 270)
-        let face = showFlipped ? (baseFace == "Heads" ? "Tails" : "Heads") : baseFace
+        // Back side visible between 90° and <270° → swap face + flip bitmap
+        let seeingBack = (a >= 90 && a < 270)
+        let face = seeingBack ? flipped(baseFace) : baseFace
+        let flipX: CGFloat = seeingBack ? -1 : 1
 
-        // - Break total angle into half-turns (180° blocks)
-        let halfIndex = Int(floor(a / 180))                 // 0 for 0..179, 1 for 180..359
-        let within = a.truncatingRemainder(dividingBy: 180) // 0..180 within this half
-        // Fold to 0..90..0 triangle wave
-        let folded = (within <= 90) ? within : (180 - within)
-        // Alternate sign each half-turn so motion stays continuous: +folded, -folded, +folded, ...
-        let renderedAngle = (halfIndex % 2 == 0) ? folded : -folded
+        // --- Signed axis tilt with attenuation on the back half ---
+        // cos(a) gives + on 0–90, − on 90–270, + on 270–360 (smooth sign flip)
+        let rad = a * .pi / 180
+        let mag = seeingBack ? backScale : 1        // attenuate only on the back
+        let signedTilt: CGFloat = tiltMag * mag * CGFloat(cos(rad))
 
-        return Image(face == "Tails" ? "coin_tails" : "coin_heads")
+        // Normalize axis (critical)
+        let vx = signedTilt, vy: CGFloat = 1
+        let len = sqrt(vx*vx + vy*vy)
+        let ax = vx / max(len, 0.0001), ay = vy / max(len, 0.0001)
+
+        return Image(imageName(for: face))
             .resizable()
+            .interpolation(.high)
             .aspectRatio(contentMode: .fit)
             .frame(width: width)
-            .position(position)
             .compositingGroup()
-            .rotation3DEffect(.degrees(renderedAngle),   // 👈 use folded angle, not raw
-                              axis: (x: 0, y: 1, z: 0),
-                              perspective: 0.7)
-            .animation(nil, value: face)                 // hard swap (no cross-fade)
+
+            // Prevent mirrored look when back is showing
+            .scaleEffect(x: flipX, y: 1, anchor: .center)
+
+            // Fixed camera pitch (keep consistent with your artwork perspective)
+            .rotation3DEffect(.degrees(pitchX), axis: (x: 1, y: 0, z: 0), anchor: .center)
+
+            // Main rotation around normalized, sign-flipping axis (center pivot)
+            .rotation3DEffect(.degrees(a),
+                              axis: (x: ax, y: ay, z: 0),
+                              anchor: .center,
+                              perspective: perspective)
+
+            // Position AFTER rotations so the pivot stays at the coin’s center
+            .position(position)
+
+            // Hard swap on face change (no cross-fade)
+            .animation(nil, value: face)
     }
 }
+
+
 
 struct ContentView: View {
     
@@ -71,7 +97,7 @@ struct ContentView: View {
     @State private var isFlipping = false
     @State private var baseFaceAtLaunch = "Heads"
     @State private var flightAngle: Double = 0
-
+    @State private var flightTarget: Double = 0
     
     var body: some View {
         GeometryReader { geo in
@@ -91,72 +117,160 @@ struct ContentView: View {
                     .clipped()
                     .ignoresSafeArea()
                 
+                
+                let progress = (flightTarget > 0) ? max(0, min(1, flightAngle / flightTarget)) : 0
+                
+                
                 FlippingCoin(angle: flightAngle,
+                             targetAngle: flightTarget,
                              baseFace: baseFaceAtLaunch,
                              width: coinD,
                              position: .init(x: W/2, y: coinCenterY))
-                .offset(y: y)
-                .scaleEffect(scale)
-                .shadow(radius: shadow, y: shadow)
-                .contentShape(Rectangle())
-                .onTapGesture { flipCoin()
+                    .offset(y: y)
+                    .scaleEffect(scale)
+                    .shadow(radius: 4 + 10 * (1 - progress),
+                                y:  4 + 12 * (1 - progress))
+                    .contentShape(Rectangle())
+                    .onTapGesture { flipCoin()
                 }
             }
             .ignoresSafeArea()
         }
     }
     // MARK: - Flip logic
-        func flipCoin() {
-            guard !isFlipping else { return }
+    func flipCoin() {
+        guard !isFlipping else { return }
 
-            let desired = Bool.random() ? "Heads" : "Tails"
+        let desired = Bool.random() ? "Heads" : "Tails"
 
-            // Capture takeoff state
-            baseFaceAtLaunch = curState
-            isFlipping = true
+        // Capture takeoff state
+        baseFaceAtLaunch = curState
+        isFlipping = true
 
-            // Choose # of half-turns so final parity matches desired face
-            let needOdd = (desired != baseFaceAtLaunch)       // odd half-turns -> flip overall
-            let halfTurns = (needOdd ? [7, 9, 11] : [6, 8, 10]).randomElement()!
+        // Choose # of half-turns so final parity matches desired face
+        let needOdd = (desired != baseFaceAtLaunch)       // odd half-turns -> flip overall
+        let halfTurns = (needOdd ? [7, 9, 11] : [6, 8, 10]).randomElement()!
 
-            // Timing & "gravity"
-            let total: Double = 0.85
-            let upDur = total * 0.38
-            let downDur = total - upDur
-            let jump: CGFloat = max(180, UIScreen.main.bounds.height * 0.32)
+        // Timing & "gravity"
+        let total: Double = 0.85
+        let upDur = total * 0.38
+        let downDur = total - upDur
+        let jump: CGFloat = max(180, UIScreen.main.bounds.height * 0.32)
+        
+        
+        flightAngle = 0
+        flightTarget = Double(halfTurns) * 180
+        withAnimation(.linear(duration: total)) {
+            flightAngle = flightTarget
+        }
 
-            // Reset flight angle and animate smoothly to target;
-            // FlippingCoin will receive interpolated angles each frame.
-            flightAngle = 0
-            withAnimation(.linear(duration: total)) {
-                flightAngle = Double(halfTurns) * 180
-            }
-
-            // Up (ease-out)
-            withAnimation(.easeOut(duration: upDur)) {
-                y = -jump
-                scale = 0.98
-                shadow = 3
-            }
-            // Down (ease-in)
-            DispatchQueue.main.asyncAfter(deadline: .now() + upDur) {
-                withAnimation(.easeIn(duration: downDur)) {
-                    y = 0
-                    scale = 1
-                    shadow = 12
-                }
-            }
-
-            // Land: commit result & streak; normalize for next flip
-            DispatchQueue.main.asyncAfter(deadline: .now() + total) {
-                curState = desired
-                if desired == baseFaceAtLaunch { streak += 1 } else { streak = 1 }
-                baseFaceAtLaunch = desired
-                isFlipping = false
-                flightAngle = 0
+        // Up (ease-out)
+        withAnimation(.easeOut(duration: upDur)) {
+            y = -jump
+            scale = 0.98
+            shadow = 3
+        }
+        // Down (ease-in)
+        DispatchQueue.main.asyncAfter(deadline: .now() + upDur) {
+            withAnimation(.easeIn(duration: downDur)) {
+                y = 0
+                scale = 1
+                shadow = 12
             }
         }
+
+        // Land: commit result & streak; normalize for next flip
+        DispatchQueue.main.asyncAfter(deadline: .now() + total) {
+            curState = desired
+            if desired == baseFaceAtLaunch { streak += 1 } else { streak = 1 }
+            baseFaceAtLaunch = desired
+            isFlipping = false
+            flightAngle = 0
+            flightTarget = 0
+        }
     }
+}
+
+
+#if DEBUG
+import SwiftUI
+
+struct CoinTiltBackScaleTuner: View {
+    @State private var angle: Double = 0                   // 0…360
+    @State private var tiltMag: CGFloat = 0.34             // base tilt magnitude
+    @State private var backScale: CGFloat = 0.86           // scale tilt on back (90–270)
+    @State private var pitchX: Double = -6                 // camera pitch
+    @State private var perspective: CGFloat = 0.60         // 0.45–0.8
+    private let demoWidth: CGFloat = 240
+
+    private func imageName(_ face: String) -> String { face == "Tails" ? "coin_tails" : "coin_heads" }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            // Normalize angle to [0, 360)
+            let a = (angle.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+            let seeingBack = (a >= 90 && a < 270)
+            let face = seeingBack ? "Tails" : "Heads"
+            let flipX: CGFloat = seeingBack ? -1 : 1
+
+            // Signed tilt with attenuation on back half
+            let rad = a * .pi / 180
+            let mag = seeingBack ? backScale : 1
+            let signedTilt: CGFloat = tiltMag * mag * CGFloat(cos(rad))
+
+            // Normalize axis
+            let vx = signedTilt, vy: CGFloat = 1
+            let len = sqrt(vx*vx + vy*vy)
+            let ax = vx / max(len, 0.0001), ay = vy / max(len, 0.0001)
+
+            // Coin
+            Image(imageName(face))
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: demoWidth)
+                .scaleEffect(x: flipX, y: 1, anchor: .center)
+                .rotation3DEffect(.degrees(pitchX), axis: (x: 1, y: 0, z: 0), anchor: .center)
+                .rotation3DEffect(.degrees(a),
+                                  axis: (x: ax, y: ay, z: 0),
+                                  anchor: .center,
+                                  perspective: perspective)
+                .border(.gray.opacity(0.2))
+
+            // Controls
+            VStack(spacing: 10) {
+                Slider(value: $angle, in: 0...360) { Text("Angle") }
+                HStack {
+                    Text("Angle \(Int(angle))°"); Spacer()
+                }
+                HStack {
+                    Text("TiltMag \(String(format: "%.2f", tiltMag))")
+                    Slider(value: $tiltMag, in: 0.20...0.50)
+                }
+                HStack {
+                    Text("BackScale \(String(format: "%.2f", backScale))")
+                    Slider(value: $backScale, in: 0.75...1.00)
+                }
+                HStack {
+                    Text("Pitch \(Int(pitchX))°")
+                    Slider(value: $pitchX, in: -12...4)
+                }
+                HStack {
+                    Text("Perspective \(String(format: "%.2f", perspective))")
+                    Slider(value: $perspective, in: 0.45...0.80)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding()
+    }
+}
+
+//#Preview { CoinTiltBackScaleTuner() }
+#endif
+
+
+
+
 
 
 #Preview {
