@@ -445,6 +445,9 @@ struct ContentView: View {
     func flipCoin() {
         guard phase == .playing else { return }   // block until pre-roll done
         guard !isFlipping else { return }
+        
+        // Random launch sound
+        SoundManager.shared.play(["launch_1","launch_2"].randomElement()!)
 
         let desired = Bool.random() ? "Heads" : "Tails"
         
@@ -490,14 +493,23 @@ struct ContentView: View {
         // Land: commit result & streak; normalize for next flip
         DispatchQueue.main.asyncAfter(deadline: .now() + total) {
             curState = desired
+            
+            
+            
             if let faceVal = Face(rawValue: desired) {
                 store.recordFlip(result: faceVal)
-                
                 if faceVal == store.chosenFace {
+                    
+                    let pitch = Float(store.currentStreak) * 0.5  // each +0.5 semitone
+                    SoundManager.shared.playPitched(base: "streak_base_pitch", semitoneOffset: pitch)
+                    
                     iconPulse = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         iconPulse = false
                     }
+                } else {
+                    // Play landing sound
+                    SoundManager.shared.play(["land_1","land_2"].randomElement()!)
                 }
             }
             baseFaceAtLaunch = desired
