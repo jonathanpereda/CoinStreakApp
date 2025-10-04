@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+
 // MARK: - Animatable coin that swaps face based on the live angle
 struct FlippingCoin: View, Animatable {
     // SwiftUI interpolates this every frame
@@ -24,10 +25,9 @@ struct FlippingCoin: View, Animatable {
     private func flipped(_ s: String) -> String { s == "Heads" ? "Tails" : "Heads" }
     private func imageName(for face: String) -> String { face == "Tails" ? "coin_tails" : "coin_heads" }
 
-    // 🔧 Tune these three to match your art; start with these values
-    private let tiltMag: CGFloat = 0.24      // base axis tilt magnitude
+    private let tiltMag: CGFloat = 0.20      // base axis tilt magnitude
     private let backScale: CGFloat = 0.14    // ↓ reduce tilt on back half (90°–270°)
-    private let pitchX: Double = 2          // fixed camera pitch (top slightly away)
+    private let pitchX: Double = -6          // fixed camera pitch (top slightly away)
     private let perspective: CGFloat = 0.51  // 0.5–0.7 looks natural
 
     var body: some View {
@@ -82,7 +82,8 @@ struct FlippingCoin: View, Animatable {
 
 struct ContentView: View {
     
-    @State private var streak = 0;
+    @StateObject private var store = FlipStore()
+    
     @State private var curState = "Heads";
     
     // animation state
@@ -108,6 +109,38 @@ struct ContentView: View {
             // center Y so the coin “sits” on the ledge line, with a bit of overlap
             let coinCenterY = H * ledgeTopYPct - coinR * (1 - coinRestOverlapPct)
             
+            let groundY = H * ledgeTopYPct
+
+            // How high the coin is (0 = on ground, 1 = apex)
+            let jumpPx   = max(180, H * 0.32)
+            let height01 = max(0, min(1, -y / jumpPx))   // t
+
+            // ---- Shadow geometry (rest vs apex) ----
+            // You already tuned these — keep your values here
+            let baseShadowW: CGFloat = coinD * 1.00      // width at rest
+            let minShadowW:  CGFloat = coinD * 0.40      // width at apex
+
+            let baseShadowH: CGFloat = coinD * 0.60      // height at rest  (your current value)
+            let minShadowH:  CGFloat = coinD * 0.22      // height at apex  (tweak to taste)
+
+            // If you want width to shrink more than height, you can bias t for height:
+            let heightShrinkBias: CGFloat = 0.75         // 0.0..1.0 (smaller = less shrink on height)
+            let th = min(1, height01 / max(heightShrinkBias, 0.0001))
+
+            // Linear interpolate
+            let shadowW = baseShadowW + (minShadowW - baseShadowW) * height01
+            let shadowHcur = baseShadowH + (minShadowH - baseShadowH) * th
+
+            // Visuals
+            let shadowOpacity = 0.28 * (1.0 - 0.65 * height01)
+            let shadowBlur    = 6.0 + 10.0 * height01
+
+            // Place ellipse center so its *top* sits on the ledge
+            let shadowYOffsetTweak: CGFloat = -157       // keep your tuned offset
+            let shadowY_centerLocked = (groundY + baseShadowH / 2) + shadowYOffsetTweak
+
+            
+            
             ZStack {
                 Color.black.ignoresSafeArea() // fallback fill (prevents any gap)
                 Image("game_background")
@@ -118,7 +151,11 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 
-                let progress = (flightTarget > 0) ? max(0, min(1, flightAngle / flightTarget)) : 0
+                Ellipse()
+                    .fill(Color.black.opacity(shadowOpacity))
+                    .frame(width: shadowW, height: shadowHcur)
+                    .blur(radius: shadowBlur)
+                    .position(x: W/2, y: shadowY_centerLocked)
                 
                 
                 FlippingCoin(angle: flightAngle,
@@ -128,13 +165,49 @@ struct ContentView: View {
                              position: .init(x: W/2, y: coinCenterY))
                     .offset(y: y)
                     .scaleEffect(scale)
-                    .shadow(radius: 4 + 10 * (1 - progress),
-                                y:  4 + 12 * (1 - progress))
                     .contentShape(Rectangle())
                     .onTapGesture { flipCoin()
+                        
                 }
+                
+                #if DEBUG
+                Button("DEV: Reset Choice") {
+                    store.chosenFace = nil
+                    store.currentStreak = 0
+                }
+                .padding(8)
+                .background(.red.opacity(0.2))
+                .cornerRadius(8)
+                #endif
+                
+                HStack{
+                    Text("Streak: \(store.currentStreak)")
+                        .font(.headline)
+                        .padding(8)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(10)
+                    Spacer()
+                }
+                
             }
             .ignoresSafeArea()
+            .overlay {
+                if store.chosenFace == nil {
+                    ChooseFaceScreen(
+                        store: store,
+                        groundY: groundY,          // <- pass the actual ledge Y you use in the game
+                        screenSize: geo.size       // <- so the chooser uses the same W/H
+                    )
+                    .frame(width: geo.size.width, height: geo.size.height)  // lock to the same box
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .zIndex(1000)
+                }
+            }
+
+
+
+
         }
     }
     // MARK: - Flip logic
@@ -177,12 +250,18 @@ struct ContentView: View {
                 scale = 1
                 shadow = 12
             }
+            withAnimation(.easeOut(duration: 0.10)) {
+                // brief widen & darken
+                // (we can fake it by nudging y slightly negative & letting height01 = 0 react)
+            }
         }
 
         // Land: commit result & streak; normalize for next flip
         DispatchQueue.main.asyncAfter(deadline: .now() + total) {
             curState = desired
-            if desired == baseFaceAtLaunch { streak += 1 } else { streak = 1 }
+            if let faceVal = Face(rawValue: desired) {
+                    store.recordFlip(result: faceVal)
+            }
             baseFaceAtLaunch = desired
             isFlipping = false
             flightAngle = 0
