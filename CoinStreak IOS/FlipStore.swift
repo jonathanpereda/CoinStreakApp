@@ -2,7 +2,7 @@ import SwiftUI
 
 enum Face: String, Codable { case Heads, Tails }
 
-struct FlipEvent: Codable, Identifiable {
+struct FlipEvent: Codable, Identifiable, Equatable {
     let id = UUID()
     let face: Face
     let date: Date
@@ -47,6 +47,12 @@ final class FlipStore: ObservableObject {
             defaults.set(data, forKey: recentKey)
         }
     }
+    
+    func clearRecent() {
+        recent.removeAll()
+        saveRecent()
+    }
+
 
     /// Call after each completed flip
     func recordFlip(result: Face) {

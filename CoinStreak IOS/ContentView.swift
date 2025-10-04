@@ -128,10 +128,63 @@ private struct StreakCounter: View {
     }
 }
 
+private func chosenIconName(_ face: Face?) -> String? {
+    guard let f = face else { return nil }
+    return (f == .Tails) ? "t_icon" : "h_icon"
+}
+
+private struct RecentFlipsColumn: View {
+    let recent: [FlipEvent]
+    let chosenFace: Face?
+    let maxShown: Int = 9   // full stack size
+
+    var body: some View {
+        // Oldest at top, newest at bottom
+        let items = Array(recent.prefix(maxShown).reversed())
+        let n = items.count
+
+        // When the column is FULL (n == maxShown), the very top hits this opacity:
+        let minOpacityAtFull: Double = 0.18
+
+        // How strong the fade is when full:
+        let totalFadeAtFull = 1.0 - minOpacityAtFull  // = 0.82
+
+        VStack(spacing: 4) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { idx, ev in
+                // idx: 0 = top (oldest), n-1 = bottom (newest)
+                let span = max(n - 1, 1)
+
+                // Dynamically raise the top opacity when the list is short:
+                // topOpacity(n) = 1 - totalFadeAtFull * (n-1)/(maxShown-1)
+                let topOpacity = 1.0 - totalFadeAtFull * (Double(n - 1) / Double(max(maxShown - 1, 1)))
+
+                // Interpolate from topOpacity (at idx=0) to 1.0 (at idx=n-1) across current n
+                let t = Double(idx) / Double(span)
+                let opacity = topOpacity + (1.0 - topOpacity) * t
+
+                let isPick = (chosenFace == ev.face)
+                let color: Color = isPick ? Color("#FFEB99") : .white
+
+                Text(ev.face == .Heads ? "H" : "T")
+                    .font(.custom("Herculanum", size: 32))
+                    .foregroundColor(color)
+                    .opacity(opacity)
+                    .shadow(radius: isPick ? 3 : 2)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+
+
+
+
 
 
 struct ContentView: View {
     @StateObject private var store = FlipStore()
+    @State private var didRestorePhase = false
 
     @State private var curState = "Heads"
 
@@ -153,6 +206,9 @@ struct ContentView: View {
     // App phase
     @State private var phase: AppPhase = .choosing
     @State private var gameplayOpacity: Double = 0   // 0 = hidden during pre-roll, 1 = visible
+    
+    //Face Icon
+    @State private var iconPulse: Bool = false
 
 
     var body: some View {
@@ -219,18 +275,6 @@ struct ContentView: View {
                 .allowsHitTesting(phase == .playing)      // disable taps until playing
 
 
-                #if DEBUG
-                Button("DEV: Reset Choice") {
-                    store.chosenFace = nil
-                    store.currentStreak = 0
-                    phase = .choosing
-                    gameplayOpacity = 0
-                }
-                .padding(8)
-                .background(.red.opacity(0.2))
-                .cornerRadius(8)
-                #endif
-
                 // Top overlay: Streak Counter
                 VStack {
                     if phase != .choosing {
@@ -243,9 +287,79 @@ struct ContentView: View {
                     Spacer()
                 }
                 .allowsHitTesting(false) // don't block coin taps
+                
+                // Bottom-right chosen-face badge (safe-area aware even with ignoresSafeArea)
+                if phase != .choosing, let icon = chosenIconName(store.chosenFace) {
+                    let size: CGFloat = 52
+                    Image(icon)
+                        .resizable()
+                        .interpolation(.high)
+                        .antialiased(true)
+                        .renderingMode(.original)
+                        .frame(width: size, height: size)
+                        .shadow(color: iconPulse ? .yellow.opacity(0.5) : .clear,
+                                    radius: iconPulse ? 18 : 0)
+                        .animation(.easeOut(duration: 0.25), value: iconPulse)
+                        .allowsHitTesting(false)
+                        .position(
+                            x: geo.size.width  - (size / 2) - max(12, geo.safeAreaInsets.trailing),
+                            y: geo.size.height - (size / 2) -  geo.safeAreaInsets.bottom
+                        )
+                        .offset(y: 60)
+                        .transition(.opacity)
+                }
+                
+                // Recent flips pillar: bottom fixed at a baseline, grows upward
+                if phase != .choosing, !store.recent.isEmpty {
+                    // Choose where the BOTTOM should live (0.0 = top, 1.0 = bottom)
+                    let baselineYPct: CGFloat = 0.30   // mid-left baseline; tweak to taste
+                    let baselineY = geo.size.height * baselineYPct
+
+                    ZStack(alignment: .bottomLeading) {
+                        RecentFlipsColumn(recent: store.recent, chosenFace: store.chosenFace)
+                            .padding(.leading, max(12, geo.safeAreaInsets.leading + 4))
+                    }
+                    // Container height == distance from top → baseline; column is bottom-aligned inside
+                    .frame(width: geo.size.width, height: baselineY, alignment: .bottomLeading)
+                    .animation(.spring(response: 0.28, dampingFraction: 0.8), value: store.recent)
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+                }
+
+
+
+
             }
             .ignoresSafeArea()
 
+            //Debug
+            
+            #if DEBUG
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    store.chosenFace = nil
+                    store.currentStreak = 0
+                    store.clearRecent()
+                    didRestorePhase = false
+                    phase = .choosing
+                    gameplayOpacity = 0
+                }label: {
+                    Image(systemName: "gearshape.fill")    // SF Symbols gear icon
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 20, height: 20)      // small size
+                        .foregroundColor(.white)
+                        .padding(10)                       // tap target
+                        .background(Color.red.opacity(0.25))
+                        .clipShape(Circle())
+                        .shadow(radius: 3)
+                }
+                .padding(.top, 2)
+                .padding(.trailing, 2)
+            }
+            #endif
+            
+            
             // Choose overlay
             .overlay {
                 if phase == .choosing {
@@ -308,6 +422,23 @@ struct ContentView: View {
 
 
         }
+        .onAppear {
+            guard !didRestorePhase else { return }
+            didRestorePhase = true
+
+            if let pick = store.chosenFace {
+                // User already chose — skip chooser forever
+                curState = pick.rawValue
+                baseFaceAtLaunch = pick.rawValue
+                gameplayOpacity = 1
+                phase = .playing
+            } else {
+                // First ever launch
+                gameplayOpacity = 0
+                phase = .choosing
+            }
+        }
+
     }
 
     // MARK: - Flip logic
@@ -315,8 +446,10 @@ struct ContentView: View {
         guard phase == .playing else { return }   // block until pre-roll done
         guard !isFlipping else { return }
 
-        //let desired = Bool.random() ? "Heads" : "Tails"
-        let desired = "Heads"
+        let desired = Bool.random() ? "Heads" : "Tails"
+        
+        //DEV TEST
+        //let desired = "Heads"
 
         // Capture takeoff state
         baseFaceAtLaunch = curState
@@ -359,6 +492,13 @@ struct ContentView: View {
             curState = desired
             if let faceVal = Face(rawValue: desired) {
                 store.recordFlip(result: faceVal)
+                
+                if faceVal == store.chosenFace {
+                    iconPulse = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        iconPulse = false
+                    }
+                }
             }
             baseFaceAtLaunch = desired
             isFlipping = false
