@@ -282,7 +282,6 @@ struct ContentView: View {
     @State private var bounceGen: Int = 0   // cancels any in-flight bounce sequence
     @State private var settleBounceT: Double = 1.0   // 0→1 drives bounce curve; 1 = idle
 
-
     // App phase
     @State private var phase: AppPhase = .choosing
     @State private var gameplayOpacity: Double = 0   // 0 = hidden during pre-roll, 1 = visible
@@ -292,6 +291,12 @@ struct ContentView: View {
     
     //DustPuff
     @State private var gameplayDustTrigger: Date? = nil
+    
+    
+    //Progress
+    @StateObject private var progression = ProgressionManager.standard()
+    @State private var barPulse: AwardPulse?
+
 
 
     var body: some View {
@@ -393,26 +398,62 @@ struct ContentView: View {
                 }
                 .allowsHitTesting(false) // don't block coin taps
                 
-                // Bottom-right chosen-face badge (safe-area aware even with ignoresSafeArea)
-                if phase != .choosing, let icon = chosenIconName(store.chosenFace) {
-                    let size: CGFloat = 52
-                    Image(icon)
-                        .resizable()
-                        .interpolation(.high)
-                        .antialiased(true)
-                        .renderingMode(.original)
-                        .frame(width: size, height: size)
-                        .shadow(color: iconPulse ? .yellow.opacity(0.5) : .clear,
-                                    radius: iconPulse ? 18 : 0)
-                        .animation(.easeOut(duration: 0.25), value: iconPulse)
-                        .allowsHitTesting(false)
-                        .position(
-                            x: geo.size.width  - (size / 2) - max(12, geo.safeAreaInsets.trailing),
-                            y: geo.size.height - (size / 2) -  geo.safeAreaInsets.bottom
-                        )
-                        .offset(y: 60)
+                // Bottom-right HUD: progress bar (left) + chosen-face badge (right)
+                .overlay(alignment: .bottomTrailing) {
+                    if phase != .choosing, let icon = chosenIconName(store.chosenFace) {
+                        let iconSize: CGFloat = 52
+                        let barWidth = min(geo.size.width * 0.70, 360)
+                        let extraRight: CGFloat = 20
+
+                        HStack(spacing: 24) {
+                            
+                            let tiltXDeg: Double = -14      // ~matches a -18% “vertical tilt” look; try -10…-14
+                            let persp: CGFloat = 0.45       // same ballpark you’re using elsewhere
+                            let barHeight: CGFloat = 28
+                            // ◀︎ Progress bar on the LEFT of the icon
+                            TierProgressBar(
+                                tierIndex: progression.tierIndex,
+                                total: progression.currentBarTotal,
+                                liveValue: progression.currentProgress,
+                                pulse: barPulse,
+                                height: barHeight,                // pass through
+                                corner: barHeight / 2             // optional: keep pill shape
+                                
+                            )
+                            .frame(width: barWidth, height: barHeight)
+                            .id("tier-\(progression.tierIndex)")    // ← force rebuild on new tier
+                            .compositingGroup() // keeps gradients/masks clean under 3D
+                            .rotation3DEffect(.degrees(tiltXDeg),
+                                              axis: (x: 1, y: 0, z: 0),
+                                              anchor: .bottom,
+                                              perspective: persp)
+                            //.offset(y: alignNudgeY) // optional: keeps the baseline visually aligned with the badge
+                            .onChange(of: progression.tierIndex) { _, _ in
+                                barPulse = nil
+                            }
+
+                            
+
+                            // ▶︎ Chosen-face badge
+                            Image(icon)
+                                .resizable()
+                                .interpolation(.high)
+                                .antialiased(true)
+                                .renderingMode(.original)
+                                .frame(width: iconSize, height: iconSize)
+                                .shadow(color: iconPulse ? .yellow.opacity(0.5) : .clear,
+                                        radius: iconPulse ? 3 : 0)
+                                .animation(.easeOut(duration: 0.25), value: iconPulse)
+                        }
+                        // Safe-area aware padding
+                        .padding(.trailing, geo.safeAreaInsets.trailing + extraRight)
+                        .padding(.bottom, geo.safeAreaInsets.bottom + 18)
                         .transition(.opacity)
+                        .allowsHitTesting(false)
+                    }
                 }
+
+
                 
                 // Recent flips pillar: bottom fixed at a baseline, grows upward
                 if phase != .choosing, !store.recent.isEmpty {
@@ -448,6 +489,11 @@ struct ContentView: View {
                     didRestorePhase = false
                     phase = .choosing
                     gameplayOpacity = 0
+                    let tx = Transaction(animation: nil)
+                    withTransaction(tx) {
+                        barPulse = nil
+                        progression.debugResetToFirstTier()
+                    }
                 }label: {
                     Image(systemName: "gearshape.fill")    // SF Symbols gear icon
                         .resizable()
@@ -683,8 +729,13 @@ struct ContentView: View {
 
             
             if let faceVal = Face(rawValue: desired) {
+                
+                let preStreak = store.currentStreak
+                let wasSuccess = (faceVal == store.chosenFace)
+                
                 store.recordFlip(result: faceVal)
-                if faceVal == store.chosenFace {
+                
+                if wasSuccess {
                     
                     let pitch = Float(store.currentStreak) * 0.5  // each +0.5 semitone
                     SoundManager.shared.playPitched(base: "streak_base_pitch", semitoneOffset: pitch)
@@ -694,6 +745,41 @@ struct ContentView: View {
                         iconPulse = false
                     }
                 } else {
+                    
+                    // END-OF-STREAK: award once if there was a run going
+                    if preStreak > 0 {
+                        // Current snapshot for the pulse
+                        let preProgress = progression.currentProgress
+                        let total = Double(progression.currentBarTotal)
+                        let needed = max(0.0, total - preProgress)
+                        let rawAward = progression.tuning.r(preStreak)
+                        let applied  = min(needed, rawAward)
+
+                        // Emit the colored wedge pulse for the UI
+                        barPulse = AwardPulse(
+                            id: UUID(),
+                            start: preProgress,
+                            delta: applied,
+                            end: preProgress + applied,
+                            color: streakColor(preStreak),
+                            tierIndex: progression.tierIndex
+                        )
+
+                        // Apply the award to the model WITHOUT spillover or immediate tier advance
+                        let didFill = progression.applyAward(len: preStreak)
+
+                        // If this award FILLS the bar, advance tier AFTER the fill animation plays
+                        if didFill {
+                            // Keep this delay in sync with TierProgressBar’s grow+fade timings (≈0.28 + 0.22)
+                            let fillAnimationDelay: Double = 0.55
+                            DispatchQueue.main.asyncAfter(deadline: .now() + fillAnimationDelay) {
+                                // Clear any stale pulse and commit the tier advance/reset
+                                barPulse = nil
+                                progression.advanceTierAfterFill()
+                            }
+                        }
+                    }
+                    
                     // Play landing sound
                     SoundManager.shared.play(["land_1","land_2"].randomElement()!)
                 }
