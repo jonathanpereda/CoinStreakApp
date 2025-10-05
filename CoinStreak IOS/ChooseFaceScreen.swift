@@ -163,6 +163,11 @@ private struct PickableCoin: View {
             guard !isAnimating else { return }
             isAnimating = true
 
+            // 🔊 Play launch sound immediately on pick
+            if let s = ["launch_1","launch_2"].randomElement() {
+                SoundManager.shared.play(s)
+            }
+            
             let total: Double = 0.75
             let upDur = total * 0.42
             let jump: CGFloat = max(160, UIScreen.main.bounds.height * 0.28)

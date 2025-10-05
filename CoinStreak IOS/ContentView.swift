@@ -289,6 +289,9 @@ struct ContentView: View {
     
     //Face Icon
     @State private var iconPulse: Bool = false
+    
+    //DustPuff
+    @State private var gameplayDustTrigger: Date? = nil
 
 
     var body: some View {
@@ -339,6 +342,23 @@ struct ContentView: View {
                         .frame(width: shadowW, height: shadowHcur)
                         .blur(radius: shadowBlur)
                         .position(x: W/2, y: shadowY_centerLocked)
+                    
+                    // Dust
+                    if let trig = gameplayDustTrigger {
+                        DustPuff(
+                            trigger: trig,
+                            originX: W / 2,
+                            groundY: (groundY + baseShadowH / 2) + shadowYOffsetTweak-52,
+                            duration: 0.48,
+                            count: 16,
+                            baseColor: Color.white.opacity(0.85),   // or match your palette
+                            shadowColor: Color.black.opacity(0.22),
+                            seed: 42
+                        )
+                        .frame(width: W, height: H)
+
+
+                    }
 
                     // Coin
                     ZStack {
@@ -496,6 +516,17 @@ struct ContentView: View {
                         onFinished: {                            // overlay fade done -> start playing
                             withAnimation(.easeInOut(duration: 0.20)) {
                                 phase = .playing
+                            }
+                        },
+                        onThud: {date in
+                            gameplayDustTrigger = date
+                            
+                            // auto-remove the puff after it finishes (match DustPuff duration + tiny buffer)
+                            let lifetime = 0.48 + 0.05
+                            DispatchQueue.main.asyncAfter(deadline: .now() + lifetime) {
+                                if gameplayDustTrigger == date {   // only clear if nothing retriggered
+                                    gameplayDustTrigger = nil
+                                }
                             }
                         }
                     )
@@ -683,6 +714,7 @@ private struct IntroOverlay: View {
     let finalFace: Face
     let onRevealGameplay: () -> Void
     let onFinished: () -> Void
+    let onThud: (Date) -> Void
 
     @State private var coinY: CGFloat = -600
     @State private var shadowW: CGFloat = 0
@@ -692,6 +724,8 @@ private struct IntroOverlay: View {
     @State private var angle: Double = -32          // stronger tilt
     @State private var dropGroupOpacity: Double = 1
     @State private var yaw: Double = -7
+    
+    @State private var dustTrigger: Date? = nil
 
     var body: some View {
         let W = screenSize.width
@@ -710,7 +744,7 @@ private struct IntroOverlay: View {
 
         ZStack {
             Color.clear
-
+            
             Group {
                 Ellipse()
                     .fill(Color.black.opacity(shadowOpacity))
@@ -765,6 +799,10 @@ private struct IntroOverlay: View {
             // (3) Touchdown → instantly hide overlay’s coin/shadow, reveal gameplay coin, fade overlay
             DispatchQueue.main.asyncAfter(deadline: .now() + dropDur) {
                 let tx = Transaction(animation: nil)
+                
+                SoundManager.shared.play("thud_1")
+                onThud(Date())
+                
                 withTransaction(tx) { dropGroupOpacity = 0 }   // hide overlay coin+shadow instantly
                 withTransaction(tx) { onRevealGameplay() }     // show gameplay coin under overlay
 

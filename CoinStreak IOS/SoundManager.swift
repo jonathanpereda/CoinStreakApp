@@ -48,7 +48,7 @@ final class SoundManager: NSObject {
 
     /// Play the base tone at a given semitone offset (for streak buildup).
     /// 1 semitone = 100 cents. Example: semitoneOffset = 7 → a perfect fifth up.
-    func playPitched(base name: String, semitoneOffset: Float, volume: Float = 0.5) {
+    func playPitched(base name: String, semitoneOffset: Float, volume: Float = 0.4) {
         guard let url = resolveURL(for: name, ext: "wav"),
               let file = try? AVAudioFile(forReading: url) else {
             print("⚠️ Missing pitched sound: \(name)")
