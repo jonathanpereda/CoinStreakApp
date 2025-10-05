@@ -141,13 +141,18 @@ private struct SettleBounce: AnimatableModifier {
 private func streakColor(_ v: Int) -> Color {
     switch v {
     case ...2:      return Color("#6E6E6E") // neutral gray
-    case 3...5:     return Color("#5B8BF7") // vibrant blue
-    case 6...8:     return Color("#00C2A8") // teal
-    case 9...10:    return Color("#7DDA58") // green
-    case 11...12:   return Color("#F7C948") // yellow/amber
-    case 13:        return Color("#FF8C00") // orange
-    case 14:        return Color("#E63946") // red
-    case 15:        return Color("#8A2BE2") // purple placeholder
+    case 3...4:     return Color("#5B8BF7") // vibrant blue
+    case 5:         return Color("#00C2A8") // teal
+    case 6:         return Color("#7DDA58") // green
+    case 7:         return Color("#F7C948") // yellow/amber
+    case 8:         return Color("#FF8C00") // orange
+    case 9:         return Color("#E63946") // red
+    case 10:        return Color("#8A2BE2") // purple
+    case 11:        return Color("#8A2BE2")
+    case 12:        return Color("#8A2BE2")
+    case 13:        return Color("#8A2BE2")
+    case 14:        return Color("#8A2BE2")
+    case 15:        return Color("#8A2BE2")
     case 16:        return Color("#8A2BE2")
     case 17:        return Color("#8A2BE2")
     case 18:        return Color("#8A2BE2")
@@ -165,7 +170,7 @@ private func streakNumberView(_ value: Int) -> some View {
     if value >= 20 {
         // Legendary tier: animated rainbow
         RainbowText(text: baseText)
-    } else if (15...19).contains(value) {
+    } else if (10...19).contains(value) {
         // High tier: shimmer sweep
         ShimmerText(text: baseText)
     } else {
@@ -182,20 +187,12 @@ private struct StreakCounter: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Image("streak_text")
-                .resizable()
-                .interpolation(.high)
-                .antialiased(true)
-                .scaledToFit()
-                .scaleEffect(0.75)
-                .allowsHitTesting(false)
-
             streakNumberView(value)
                 .shadow(radius: 10)
                 .scaleEffect(pop)
                 .animation(.spring(response: 0.22, dampingFraction: 0.55, blendDuration: 0.1), value: pop)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 93)
         .padding(.horizontal, 16)
         .onChange(of: value, initial: false) { oldValue, newValue in
             pop = 1.18
@@ -291,6 +288,7 @@ struct ContentView: View {
     
     //DustPuff
     @State private var gameplayDustTrigger: Date? = nil
+    @State private var backwallDustTrigger: Date? = nil
     
     
     //Progress
@@ -331,8 +329,34 @@ struct ContentView: View {
             let shadowY_centerLocked = (groundY + baseShadowH / 2) + shadowYOffsetTweak
 
             ZStack {
-                Color.black.ignoresSafeArea() // fallback fill
-                Image("game_background")
+                
+                BackwallSwitcher(
+                    tierName: progression.currentTierName,
+                    onDropImpact: { impact in
+                        backwallDustTrigger = impact
+                        let lifetime = 0.48 + 0.05
+                        DispatchQueue.main.asyncAfter(deadline: .now() + lifetime) {
+                            if backwallDustTrigger == impact { backwallDustTrigger = nil }
+                        }
+                    }
+                )
+                
+                
+                if let trig = backwallDustTrigger {
+                    // pick a baseline just *behind* the table’s top edge
+                    let tableTopY = groundY - 35   // this is the same "ledge" baseline you already compute
+                    SceneDustPlume(
+                        trigger: trig,
+                        lipY: tableTopY,         // ← the lip you measured (e.g., groundY - 255)
+                        width: W,
+                        height: H,
+                        horizNarrow: 1.3,       // tweak to taste
+                        vertStretch: 1.9,
+                        windowWidthFrac: 0.60
+                    )
+                }
+                
+                Image("starter_table")
                     .resizable()
                     .scaledToFill()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -410,6 +434,8 @@ struct ContentView: View {
                             let tiltXDeg: Double = -14      // ~matches a -18% “vertical tilt” look; try -10…-14
                             let persp: CGFloat = 0.45       // same ballpark you’re using elsewhere
                             let barHeight: CGFloat = 28
+                            let barColor = LinearGradient(colors: [ Color("#908B7A"), Color("#C0BAA2") ],
+                                                      startPoint: .leading, endPoint: .trailing)
                             // ◀︎ Progress bar on the LEFT of the icon
                             TierProgressBar(
                                 tierIndex: progression.tierIndex,
@@ -417,7 +443,8 @@ struct ContentView: View {
                                 liveValue: progression.currentProgress,
                                 pulse: barPulse,
                                 height: barHeight,                // pass through
-                                corner: barHeight / 2             // optional: keep pill shape
+                                corner: barHeight / 2,             // optional: keep pill shape
+                                baseFill: barColor
                                 
                             )
                             .frame(width: barWidth, height: barHeight)
@@ -477,6 +504,7 @@ struct ContentView: View {
 
             }
             .ignoresSafeArea()
+
 
             //Debug
             
@@ -669,7 +697,7 @@ struct ContentView: View {
         let desired = Bool.random() ? "Heads" : "Tails"
         
         //DEV TEST
-        //let desired = "Heads"
+        //let desired = "Tails"
 
         // Capture takeoff state
         baseFaceAtLaunch = curState

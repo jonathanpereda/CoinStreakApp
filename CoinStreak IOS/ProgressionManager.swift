@@ -67,11 +67,11 @@ final class ProgressionManager: ObservableObject {
         // These should mirror your BuildBars tuning. Adjust as you rebalance.
         let tuning = ProgressTuning(p: 0.5, c: 1.7, gamma: 0.7)
         let specs: [ProgressTierSpec] = [
-            .init(name: "Bronze",   targetFlips: 10),
-            .init(name: "Silver",   targetFlips: 20),
-            .init(name: "Gold",     targetFlips: 50),
-            .init(name: "Platinum", targetFlips: 280),
-            .init(name: "Mythic",   targetFlips: 380),
+            .init(name: "Starter",   targetFlips: 1),
+            .init(name: "Map1",   targetFlips: 20),
+            .init(name: "Map2",     targetFlips: 50),
+            .init(name: "Map3", targetFlips: 280),
+            .init(name: "Map4",   targetFlips: 380),
         ]
         let tiers = buildTiers(tuning: tuning, specs: specs)
         return ProgressionManager(tuning: tuning, tiers: tiers)
