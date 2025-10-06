@@ -34,7 +34,7 @@ struct ChooseFaceScreen: View {
         let coinCenterY = groundY - coinR * (1 - coinRestOverlapPct)
 
         ZStack {
-            Image("game_background")
+            Image("game_background2")
                 .resizable()
                 .scaledToFill()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

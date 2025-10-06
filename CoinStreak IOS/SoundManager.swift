@@ -28,8 +28,10 @@ final class SoundManager: NSObject {
 
     /// Play a short one-shot SFX (e.g., launch_1, land_2).
     func play(_ name: String, volume: Float = 1.0) {
-        guard let url = resolveURL(for: name, ext: "wav") else {
-            print("⚠️ Missing sound: \(name)")
+        let url = resolveURL(for: name, ext: "wav")
+              ?? resolveURL(for: name, ext: "mp3")   // ← add this
+        guard let url else {
+            print("⚠️ Missing sound: \(name) (.wav/.mp3 not found)")
             return
         }
         do {
@@ -37,14 +39,13 @@ final class SoundManager: NSObject {
             p.volume = volume
             p.prepareToPlay()
             p.play()
-            // Retain until playback ends
             players[name] = p
-            // Cleanup when finished (optional)
             p.delegate = self
         } catch {
             print("🔈 Sound error (\(name)): \(error.localizedDescription)")
         }
     }
+
 
     /// Play the base tone at a given semitone offset (for streak buildup).
     /// 1 semitone = 100 cents. Example: semitoneOffset = 7 → a perfect fifth up.
@@ -151,5 +152,89 @@ extension SoundManager: AVAudioPlayerDelegate {
             players.removeValue(forKey: k)
             break
         }
+    }
+}
+
+// MARK: - Background loop (tier ambience/music)
+extension SoundManager {
+    private static var bgmPlayer: AVAudioPlayer?
+    private static var bgmFaderTimer: Timer?
+    private static var bgmCurrentName: String?
+
+    /// Start (or swap) a looping track with a gentle fade-in.
+    /// Looks for .wav first (your default), then .mp3.
+    func startLoop(named name: String, volume: Float = 0.8, fadeIn: TimeInterval = 0.8) {
+        // If same track already playing, just fade to target volume
+        if Self.bgmCurrentName == name, let p = Self.bgmPlayer, p.isPlaying {
+            fade(to: volume, over: fadeIn)
+            return
+        }
+
+        // Stop any existing loop quickly before starting new one
+        stopLoop(fadeOut: 0.15)
+
+        // Resolve URL (prefer wav, then mp3)
+        let url = resolveURL(for: name, ext: "wav")
+              ?? resolveURL(for: name, ext: "mp3")
+
+        guard let url else {
+            print("⚠️ Loop asset '\(name)' not found (.wav or .mp3)")
+            return
+        }
+
+        // Make sure the session is active (mixes with others by default in your setup)
+        ensureAudioSessionActive()
+
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.numberOfLoops = -1
+            player.volume = 0.0
+            player.prepareToPlay()
+            player.play()
+
+            Self.bgmPlayer = player
+            Self.bgmCurrentName = name
+            fade(to: volume, over: fadeIn)
+        } catch {
+            print("⚠️ Failed to start loop '\(name)': \(error)")
+        }
+    }
+
+    /// Stop the loop with a gentle fade-out (and release the player).
+    func stopLoop(fadeOut: TimeInterval = 0.6) {
+        guard let p = Self.bgmPlayer, p.isPlaying else { return }
+        fade(to: 0.0, over: fadeOut) {
+            Self.bgmPlayer?.stop()
+            Self.bgmPlayer = nil
+            Self.bgmCurrentName = nil
+        }
+    }
+
+    /// Smooth volume ramp utility.
+    private func fade(to target: Float, over duration: TimeInterval, completion: (() -> Void)? = nil) {
+        Self.bgmFaderTimer?.invalidate()
+
+        guard duration > 0, let player = Self.bgmPlayer else {
+            Self.bgmPlayer?.volume = target
+            completion?()
+            return
+        }
+
+        let steps = 30
+        let dt = duration / Double(steps)
+        let start = player.volume
+        var i = 0
+
+        let timer = Timer.scheduledTimer(withTimeInterval: dt, repeats: true) { timer in
+            i += 1
+            let t = min(1.0, Double(i) / Double(steps))
+            player.volume = start + Float(t) * (target - start)
+            if t >= 1.0 {
+                timer.invalidate()
+                completion?()
+            }
+        }
+        Self.bgmFaderTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 }

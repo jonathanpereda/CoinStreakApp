@@ -21,7 +21,7 @@ struct CoinStreak_IOSApp: App {
 
 private func registerAllBundleFonts() {
     // Works whether your fonts are in a group (“grey folder”) or a real subdirectory.
-    for ext in ["ttf", "otf"] {
+    for ext in ["ttf", "otf", "ttc"] {
         if let urls = Bundle.main.urls(forResourcesWithExtension: ext, subdirectory: nil) {
             for url in urls {
                 var error: Unmanaged<CFError>?

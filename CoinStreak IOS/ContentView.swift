@@ -138,16 +138,30 @@ private struct SettleBounce: AnimatableModifier {
 private struct TierTheme {
     let backwall: String   // asset name for the backwall image
     let font: String       // display font name for StreakCounter
+    let loop: String?      // OPTIONAL: audio file name in bundle (no extension)
+    let loopGain: Float    // 0.0–1.0
 }
 
 private func tierTheme(for tierName: String) -> TierTheme {
     switch tierName {
-    case "Starter": return .init(backwall: "starter_backwall", font: "Herculanum")
-    case "Map1":    return .init(backwall: "map1_backwall",    font: "Copperplate")
-    case "Map2":    return .init(backwall: "map2_backwall",    font: "Avenir-Heavy")
-    case "Map3":    return .init(backwall: "map3_backwall",    font: "Futura-Bold")
-    case "Map4":    return .init(backwall: "map4_backwall",    font: "GillSans-Bold")
-    default:        return .init(backwall: "starter_backwall", font: "Herculanum")
+    case "Starter":
+        return .init(backwall: "starter_backwall", font: "Herculanum",
+                     loop: nil, loopGain: 0.5)
+    case "Lab":
+        return .init(backwall: "lab_backwall", font: "Beirut",
+                     loop: nil, loopGain: 0.5)
+    case "Pond":
+        return .init(backwall: "pond_backwall", font: "Chalkduster",
+                     loop: "pond_mice", loopGain: 0.45)
+    case "Map3":
+        return .init(backwall: "map3_backwall", font: "Futura-Bold",
+                     loop: nil, loopGain: 0.5)
+    case "Map4":
+        return .init(backwall: "map4_backwall", font: "GillSans-Bold",
+                     loop: nil, loopGain: 0.5)
+    default:
+        return .init(backwall: "starter_backwall", font: "Herculanum",
+                     loop: nil, loopGain: 0.5)
     }
 }
 
@@ -173,6 +187,16 @@ private func streakColor(_ v: Int) -> Color {
     default:        return Color("#8A2BE2") // 20+
     }
 }
+
+private func updateTierLoop(_ theme: TierTheme) {
+    if let loopName = theme.loop {
+        SoundManager.shared.startLoop(named: loopName, volume: theme.loopGain, fadeIn: 0.8)
+    } else {
+        // No loop for this tier
+        SoundManager.shared.stopLoop(fadeOut: 0.5)
+    }
+}
+
 
 @ViewBuilder
 private func streakNumberView(_ value: Int, fontName: String) -> some View {
@@ -390,7 +414,7 @@ struct ContentView: View {
                     )
                 }
                 
-                Image("starter_table")
+                Image("starter_table2")
                     .resizable()
                     .scaledToFill()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -631,7 +655,10 @@ struct ContentView: View {
 
         }
         .onAppear {
-            guard !didRestorePhase else { return }
+            guard !didRestorePhase else {
+                updateTierLoop(tierTheme(for: progression.currentTierName))
+                return
+            }
             didRestorePhase = true
 
             if let pick = store.chosenFace {
@@ -645,7 +672,23 @@ struct ContentView: View {
                 gameplayOpacity = 0
                 phase = .choosing
             }
+            
+            updateTierLoop(tierTheme(for: progression.currentTierName))
         }
+        .onChange(of: progression.tierIndex) { _, _ in
+            SoundManager.shared.play("scrape_1")
+            let newTheme = tierTheme(for: progression.currentTierName)
+            updateTierLoop(newTheme)
+        }
+        /*.onChange(of: phase) { _, newPhase in
+            if newPhase == .playing {
+                updateTierLoop(tierTheme(for: progression.currentTierName))
+            } else {
+                SoundManager.shared.stopLoop(fadeOut: 0.4)
+            }
+        }*/
+
+
 
     }
     
@@ -818,6 +861,8 @@ struct ContentView: View {
                         if didFill {
                             // Keep this delay in sync with TierProgressBar’s grow+fade timings (≈0.28 + 0.22)
                             let fillAnimationDelay: Double = 0.55
+                            
+                            SoundManager.shared.stopLoop(fadeOut: 0.6)
                             
                             withAnimation(.easeOut(duration: fillAnimationDelay * 0.9)) {
                                 counterOpacity = 0.0

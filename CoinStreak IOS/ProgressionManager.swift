@@ -68,8 +68,8 @@ final class ProgressionManager: ObservableObject {
         let tuning = ProgressTuning(p: 0.5, c: 1.7, gamma: 0.7)
         let specs: [ProgressTierSpec] = [
             .init(name: "Starter",   targetFlips: 1),
-            .init(name: "Map1",   targetFlips: 75),
-            .init(name: "Map2",     targetFlips: 50),
+            .init(name: "Lab",   targetFlips: 1),
+            .init(name: "Pond",     targetFlips: 50),
             .init(name: "Map3", targetFlips: 280),
             .init(name: "Map4",   targetFlips: 380),
         ]
