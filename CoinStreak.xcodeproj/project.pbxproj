@@ -10,9 +10,6 @@
 		A41B99722E93602900D7059D /* Beirut.ttc in Resources */ = {isa = PBXBuildFile; fileRef = A41B99712E93602900D7059D /* Beirut.ttc */; };
 		A41B99732E93602900D7059D /* Beirut.ttc in Resources */ = {isa = PBXBuildFile; fileRef = A41B99712E93602900D7059D /* Beirut.ttc */; };
 		A41B99742E93602900D7059D /* Beirut.ttc in Resources */ = {isa = PBXBuildFile; fileRef = A41B99712E93602900D7059D /* Beirut.ttc */; };
-		A41B997A2E93B15900D7059D /* Chalkduster.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A41B99792E93B15900D7059D /* Chalkduster.ttf */; };
-		A41B997B2E93B15900D7059D /* Chalkduster.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A41B99792E93B15900D7059D /* Chalkduster.ttf */; };
-		A41B997C2E93B15900D7059D /* Chalkduster.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A41B99792E93B15900D7059D /* Chalkduster.ttf */; };
 		A4CB79FE2E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
 		A4CB79FF2E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
 		A4CB7A002E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
@@ -37,7 +34,6 @@
 
 /* Begin PBXFileReference section */
 		A41B99712E93602900D7059D /* Beirut.ttc */ = {isa = PBXFileReference; lastKnownFileType = file; path = Beirut.ttc; sourceTree = "<group>"; };
-		A41B99792E93B15900D7059D /* Chalkduster.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Chalkduster.ttf; sourceTree = "<group>"; };
 		A45109402E904FEE00E4AE05 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		A45109462E90546000E4AE05 /* CoinStreak IOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CoinStreak IOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A45109552E90546100E4AE05 /* CoinStreak IOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CoinStreak IOSTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -113,7 +109,6 @@
 		A4CB79FC2E912FB500BCBFAE /* Fonts */ = {
 			isa = PBXGroup;
 			children = (
-				A41B99792E93B15900D7059D /* Chalkduster.ttf */,
 				A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */,
 				A41B99712E93602900D7059D /* Beirut.ttc */,
 			);
@@ -241,7 +236,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				A4CB79FF2E91300E00BCBFAE /* Herculanum.ttf in Resources */,
-				A41B997C2E93B15900D7059D /* Chalkduster.ttf in Resources */,
 				A41B99732E93602900D7059D /* Beirut.ttc in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -251,7 +245,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				A41B99722E93602900D7059D /* Beirut.ttc in Resources */,
-				A41B997B2E93B15900D7059D /* Chalkduster.ttf in Resources */,
 				A4CB79FE2E91300E00BCBFAE /* Herculanum.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -261,7 +254,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				A41B99742E93602900D7059D /* Beirut.ttc in Resources */,
-				A41B997A2E93B15900D7059D /* Chalkduster.ttf in Resources */,
 				A4CB7A002E91300E00BCBFAE /* Herculanum.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

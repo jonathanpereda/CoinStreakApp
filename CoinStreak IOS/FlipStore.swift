@@ -6,6 +6,10 @@ struct FlipEvent: Codable, Identifiable, Equatable {
     let id = UUID()
     let face: Face
     let date: Date
+    
+    private enum CodingKeys: String, CodingKey {
+        case face, date
+    }
 }
 
 final class FlipStore: ObservableObject {

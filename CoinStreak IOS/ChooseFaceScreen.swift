@@ -227,5 +227,4 @@ private struct ChooseFaceScreenPreviewWrapper: View {
 
 #Preview("ChooseFaceScreen") {
     ChooseFaceScreenPreviewWrapper()
-        .previewDevice("iPhone 16 Pro")
 }

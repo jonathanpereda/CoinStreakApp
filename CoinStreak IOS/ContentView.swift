@@ -173,18 +173,18 @@ private func streakColor(_ v: Int) -> Color {
     case 6:         return Color("#7DDA58") // green
     case 7:         return Color("#F7C948") // yellow/amber
     case 8:         return Color("#FF8C00") // orange
-    case 9:         return Color("#E63946") // red
-    case 10:        return Color("#8A2BE2") // purple
-    case 11:        return Color("#8A2BE2")
-    case 12:        return Color("#8A2BE2")
-    case 13:        return Color("#8A2BE2")
-    case 14:        return Color("#8A2BE2")
-    case 15:        return Color("#8A2BE2")
-    case 16:        return Color("#8A2BE2")
-    case 17:        return Color("#8A2BE2")
-    case 18:        return Color("#8A2BE2")
-    case 19:        return Color("#8A2BE2")
-    default:        return Color("#8A2BE2") // 20+
+    case 9:         return Color("#E63946") // Ember Glow red
+    case 10:        return Color("#8A2BE2") // Royal Shimmer purple
+    case 11:        return Color("#00C2A8") // Aurora Sweep teal
+    case 12:        return Color("#7DDA58") // Neon Lime pulse
+    case 13:        return Color("#F7C948") // Gilded Sheen gold
+    case 14:        return Color("#5B8BF7") // Sapphire Scanline blue
+    case 15:        return Color("#C94BD6") // Magenta Flux violet-magenta
+    case 16:        return Color("#FF8C00") // Fire & Ice warm tone
+    case 17:        return Color("#7E2DF2") // Starlight Spark deep purple
+    case 18:        return Color("#B400FF") // Chromatic Split violet
+    case 19:        return Color("#8A2BE2") // Holo Prism fallback purple
+    default:        return Color("#FFEA00") // Legendary Rainbow gold
     }
 }
 
@@ -204,15 +204,34 @@ private func streakNumberView(_ value: Int, fontName: String) -> some View {
         Text("\(value)")
             .font(.custom(fontName, size: 124))
 
-    if value >= 20 {
-        // Legendary tier: animated rainbow
-        RainbowText(text: baseText)
-    } else if (10...19).contains(value) {
-        // High tier: shimmer sweep
-        ShimmerText(text: baseText)
-    } else {
-        // Normal tiers: solid color ramp
-        baseText.foregroundColor(streakColor(value))
+    switch value {
+        case 0...8:
+            baseText.foregroundColor(streakColor(value))
+
+        case 9:
+            GlowText(text: baseText)                // Ember Glow (red)
+        case 10:
+            ShimmerText(text: baseText)             // Royal Shimmer (purple)
+        case 11:
+            AuroraText(text: baseText)              // Teal drift
+        case 12:
+            SurgeText(text: baseText)               // Lime inner pulse
+        case 13:
+            GoldSheenText(text: baseText)           // Metallic sheen
+        case 14:
+            ScanlineText(text: baseText)            // Sapphire scanline
+        case 15:
+            FluxText(text: baseText)                // Violet ↔ Magenta morph
+        case 16:
+            DiagonalDuoText(text: baseText)         // Fire & Ice diagonal
+        case 17:
+            ArcPulseText(text: baseText)             // Starlight glints
+        case 18:
+            ChromaticSplitText(text: baseText)      // RGB parallax
+        case 19:
+            HoloPrismText(text: baseText)           // Iridescent orbit
+        default: // 20+
+            LegendaryText(text: baseText)             // Legendary rainbow
     }
 }
 
