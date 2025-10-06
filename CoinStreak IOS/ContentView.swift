@@ -350,6 +350,8 @@ struct ContentView: View {
     //Progress
     @StateObject private var progression = ProgressionManager.standard()
     @State private var barPulse: AwardPulse?
+    @State private var barValueOverride: Double? = nil
+    @State private var isTierTransitioning = false
 
 
 
@@ -457,7 +459,7 @@ struct ContentView: View {
                         TierProgressBar(
                             tierIndex: progression.tierIndex,
                             total: progression.currentBarTotal,
-                            liveValue: progression.currentProgress,
+                            liveValue: barValueOverride ?? progression.currentProgress,
                             pulse: barPulse,
                             height: barHeight,
                             corner: barHeight / 2,
@@ -759,7 +761,7 @@ struct ContentView: View {
     // MARK: - Flip logic
     func flipCoin() {
         guard phase == .playing else { return }   // block until pre-roll done
-        guard !isFlipping else { return }
+        guard !isFlipping && !isTierTransitioning else { return }
         
         // Cancel any ongoing bounce/wobble and reset pose instantly
         withTransaction(.init(animation: nil)) {
@@ -856,6 +858,11 @@ struct ContentView: View {
                     
                     // END-OF-STREAK: award once if there was a run going
                     if preStreak > 0 {
+                        
+                        if preStreak >= 5 {
+                            SoundManager.shared.play("boost_1")
+                        }
+                        
                         // Current snapshot for the pulse
                         let preProgress = progression.currentProgress
                         let total = Double(progression.currentBarTotal)
@@ -878,8 +885,12 @@ struct ContentView: View {
 
                         // If this award FILLS the bar, advance tier AFTER the fill animation plays
                         if didFill {
+                            isTierTransitioning = true
                             // Keep this delay in sync with TierProgressBar’s grow+fade timings (≈0.28 + 0.22)
                             let fillAnimationDelay: Double = 0.55
+                            
+                            // complete_1 sound delay
+                            let postCompletePause: Double = 0.25
                             
                             SoundManager.shared.stopLoop(fadeOut: 0.6)
                             
@@ -887,16 +898,32 @@ struct ContentView: View {
                                 counterOpacity = 0.0
                             }
                             
+                            // When the fill animation finishes, play the completion sting
                             DispatchQueue.main.asyncAfter(deadline: .now() + fillAnimationDelay) {
-                                
-                                let tx = Transaction(animation: nil)
-                                        withTransaction(tx) {
-                                    counterOpacity = 1.0
-                                }
-                                
-                                // Clear any stale pulse and commit the tier advance/reset
+                                SoundManager.shared.play("complete_1")
+
+                                // Stop drawing the award wedge (so only the main fill animates back)
                                 barPulse = nil
-                                progression.advanceTierAfterFill()
+
+                                // Start from whatever "full" is right now and animate down to 0
+                                let fullNow = progression.currentProgress     // should equal currentBarTotal
+                                barValueOverride = fullNow
+
+                                withAnimation(.linear(duration: max(0.65, postCompletePause * 0.8))) {
+                                    barValueOverride = 0.0
+                                }
+
+                                // After the pause, reset override and advance tier (switch backwall)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + postCompletePause) {
+                                    let tx = Transaction(animation: nil)
+                                    withTransaction(tx) {
+                                        counterOpacity = 1.0
+                                        barValueOverride = nil   // go back to using the model value
+                                    }
+
+                                    progression.advanceTierAfterFill() // model resets to empty; no visual snap now
+                                    isTierTransitioning = false
+                                }
                             }
                         }
                     }
