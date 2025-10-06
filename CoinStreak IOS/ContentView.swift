@@ -134,9 +134,22 @@ private struct SettleBounce: AnimatableModifier {
     }
 }
 
+// Central theme for each tier: backwall art + font (expand later with colors, sfx, etc.)
+private struct TierTheme {
+    let backwall: String   // asset name for the backwall image
+    let font: String       // display font name for StreakCounter
+}
 
-
-
+private func tierTheme(for tierName: String) -> TierTheme {
+    switch tierName {
+    case "Starter": return .init(backwall: "starter_backwall", font: "Herculanum")
+    case "Map1":    return .init(backwall: "map1_backwall",    font: "Copperplate")
+    case "Map2":    return .init(backwall: "map2_backwall",    font: "Avenir-Heavy")
+    case "Map3":    return .init(backwall: "map3_backwall",    font: "Futura-Bold")
+    case "Map4":    return .init(backwall: "map4_backwall",    font: "GillSans-Bold")
+    default:        return .init(backwall: "starter_backwall", font: "Herculanum")
+    }
+}
 
 private func streakColor(_ v: Int) -> Color {
     switch v {
@@ -162,10 +175,10 @@ private func streakColor(_ v: Int) -> Color {
 }
 
 @ViewBuilder
-private func streakNumberView(_ value: Int) -> some View {
+private func streakNumberView(_ value: Int, fontName: String) -> some View {
     let baseText =
         Text("\(value)")
-            .font(.custom("Herculanum", size: 124))
+            .font(.custom(fontName, size: 124))
 
     if value >= 20 {
         // Legendary tier: animated rainbow
@@ -179,20 +192,19 @@ private func streakNumberView(_ value: Int) -> some View {
     }
 }
 
-
-
 private struct StreakCounter: View {
     let value: Int
+    let fontName: String
     @State private var pop: CGFloat = 1.0
 
     var body: some View {
         VStack(spacing: 20) {
-            streakNumberView(value)
+            streakNumberView(value, fontName: fontName)
                 .shadow(radius: 10)
                 .scaleEffect(pop)
                 .animation(.spring(response: 0.22, dampingFraction: 0.55, blendDuration: 0.1), value: pop)
         }
-        .padding(.vertical, 93)
+        .padding(.vertical, 90)
         .padding(.horizontal, 16)
         .onChange(of: value, initial: false) { oldValue, newValue in
             pop = 1.18
@@ -282,6 +294,7 @@ struct ContentView: View {
     // App phase
     @State private var phase: AppPhase = .choosing
     @State private var gameplayOpacity: Double = 0   // 0 = hidden during pre-roll, 1 = visible
+    @State private var counterOpacity: Double = 1.0
     
     //Face Icon
     @State private var iconPulse: Bool = false
@@ -327,11 +340,13 @@ struct ContentView: View {
 
             let shadowYOffsetTweak: CGFloat = -157
             let shadowY_centerLocked = (groundY + baseShadowH / 2) + shadowYOffsetTweak
+            
+            let theme = tierTheme(for: progression.currentTierName)
 
             ZStack {
                 
                 BackwallSwitcher(
-                    tierName: progression.currentTierName,
+                    backwallName: theme.backwall,
                     onDropImpact: { impact in
                         backwallDustTrigger = impact
                         let lifetime = 0.48 + 0.05
@@ -339,7 +354,26 @@ struct ContentView: View {
                             if backwallDustTrigger == impact { backwallDustTrigger = nil }
                         }
                     }
-                )
+                ) {
+                    
+                    // Top overlay: Streak Counter
+                    if phase != .choosing {
+                        VStack {
+                            StreakCounter(
+                                value: store.currentStreak,
+                                fontName: theme.font
+                            )
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 75)
+                            .padding(.horizontal, 20)
+                            Spacer()
+                        }
+                        .opacity(counterOpacity)
+                        .allowsHitTesting(false)
+                        .zIndex(0.5)    // ← key line: between new wall (0) and outgoing wall (1)
+                        .transition(.opacity)
+                    }
+                }
                 
                 
                 if let trig = backwallDustTrigger {
@@ -362,6 +396,61 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
                     .ignoresSafeArea()
+                
+                
+                // HUD: progress bar + chosen-face badge (single instance, top of stack)
+                if phase != .choosing, let icon = chosenIconName(store.chosenFace) {
+                    let iconSize: CGFloat = 52
+                    let barWidth = min(geo.size.width * 0.70, 360)
+                    let extraRight: CGFloat = 20
+
+                    HStack(spacing: 24) {
+                        let tiltXDeg: Double = -14
+                        let persp: CGFloat = 0.45
+                        let barHeight: CGFloat = 28
+                        let barColor = LinearGradient(colors: [ Color("#908B7A"), Color("#C0BAA2") ],
+                                                      startPoint: .leading, endPoint: .trailing)
+
+                        TierProgressBar(
+                            tierIndex: progression.tierIndex,
+                            total: progression.currentBarTotal,
+                            liveValue: progression.currentProgress,
+                            pulse: barPulse,
+                            height: barHeight,
+                            corner: barHeight / 2,
+                            baseFill: barColor
+                        )
+                        .frame(width: barWidth, height: barHeight)
+                        .id("tier-\(progression.tierIndex)")
+                        .compositingGroup()
+                        .rotation3DEffect(.degrees(tiltXDeg),
+                                          axis: (x: 1, y: 0, z: 0),
+                                          anchor: .bottom,
+                                          perspective: persp)
+                        .onChange(of: progression.tierIndex) { _, _ in
+                            barPulse = nil
+                        }
+
+                        Image(icon)
+                            .resizable()
+                            .interpolation(.high)
+                            .antialiased(true)
+                            .renderingMode(.original)
+                            .frame(width: iconSize, height: iconSize)
+                            .shadow(color: iconPulse ? .yellow.opacity(0.5) : .clear,
+                                    radius: iconPulse ? 3 : 0)
+                            .animation(.easeOut(duration: 0.25), value: iconPulse)
+                    }
+                    .padding(.trailing, geo.safeAreaInsets.trailing + extraRight)
+                    .padding(.bottom, geo.safeAreaInsets.bottom + 18)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .allowsHitTesting(false)
+                    .zIndex(50)                // keep comfortably above table/gameplay
+                    .transition(.opacity)
+                }
+
+                
+                
 
                 // Gameplay shadow + coin are always in the tree; opacity gates visibility.
                 Group {
@@ -408,77 +497,6 @@ struct ContentView: View {
                 .opacity(gameplayOpacity)                 // <— no animation; see onReveal below
                 .allowsHitTesting(phase == .playing)      // disable taps until playing
 
-
-                // Top overlay: Streak Counter
-                VStack {
-                    if phase != .choosing {
-                        StreakCounter(value: store.currentStreak)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 75)
-                            .padding(.horizontal, 20)
-                            .transition(.opacity)
-                    }
-                    Spacer()
-                }
-                .allowsHitTesting(false) // don't block coin taps
-                
-                // Bottom-right HUD: progress bar (left) + chosen-face badge (right)
-                .overlay(alignment: .bottomTrailing) {
-                    if phase != .choosing, let icon = chosenIconName(store.chosenFace) {
-                        let iconSize: CGFloat = 52
-                        let barWidth = min(geo.size.width * 0.70, 360)
-                        let extraRight: CGFloat = 20
-
-                        HStack(spacing: 24) {
-                            
-                            let tiltXDeg: Double = -14      // ~matches a -18% “vertical tilt” look; try -10…-14
-                            let persp: CGFloat = 0.45       // same ballpark you’re using elsewhere
-                            let barHeight: CGFloat = 28
-                            let barColor = LinearGradient(colors: [ Color("#908B7A"), Color("#C0BAA2") ],
-                                                      startPoint: .leading, endPoint: .trailing)
-                            // ◀︎ Progress bar on the LEFT of the icon
-                            TierProgressBar(
-                                tierIndex: progression.tierIndex,
-                                total: progression.currentBarTotal,
-                                liveValue: progression.currentProgress,
-                                pulse: barPulse,
-                                height: barHeight,                // pass through
-                                corner: barHeight / 2,             // optional: keep pill shape
-                                baseFill: barColor
-                                
-                            )
-                            .frame(width: barWidth, height: barHeight)
-                            .id("tier-\(progression.tierIndex)")    // ← force rebuild on new tier
-                            .compositingGroup() // keeps gradients/masks clean under 3D
-                            .rotation3DEffect(.degrees(tiltXDeg),
-                                              axis: (x: 1, y: 0, z: 0),
-                                              anchor: .bottom,
-                                              perspective: persp)
-                            //.offset(y: alignNudgeY) // optional: keeps the baseline visually aligned with the badge
-                            .onChange(of: progression.tierIndex) { _, _ in
-                                barPulse = nil
-                            }
-
-                            
-
-                            // ▶︎ Chosen-face badge
-                            Image(icon)
-                                .resizable()
-                                .interpolation(.high)
-                                .antialiased(true)
-                                .renderingMode(.original)
-                                .frame(width: iconSize, height: iconSize)
-                                .shadow(color: iconPulse ? .yellow.opacity(0.5) : .clear,
-                                        radius: iconPulse ? 3 : 0)
-                                .animation(.easeOut(duration: 0.25), value: iconPulse)
-                        }
-                        // Safe-area aware padding
-                        .padding(.trailing, geo.safeAreaInsets.trailing + extraRight)
-                        .padding(.bottom, geo.safeAreaInsets.bottom + 18)
-                        .transition(.opacity)
-                        .allowsHitTesting(false)
-                    }
-                }
 
 
                 
@@ -697,7 +715,7 @@ struct ContentView: View {
         let desired = Bool.random() ? "Heads" : "Tails"
         
         //DEV TEST
-        //let desired = "Tails"
+        //let desired = "Heads"
 
         // Capture takeoff state
         baseFaceAtLaunch = curState
@@ -800,7 +818,18 @@ struct ContentView: View {
                         if didFill {
                             // Keep this delay in sync with TierProgressBar’s grow+fade timings (≈0.28 + 0.22)
                             let fillAnimationDelay: Double = 0.55
+                            
+                            withAnimation(.easeOut(duration: fillAnimationDelay * 0.9)) {
+                                counterOpacity = 0.0
+                            }
+                            
                             DispatchQueue.main.asyncAfter(deadline: .now() + fillAnimationDelay) {
+                                
+                                let tx = Transaction(animation: nil)
+                                        withTransaction(tx) {
+                                    counterOpacity = 1.0
+                                }
+                                
                                 // Clear any stale pulse and commit the tier advance/reset
                                 barPulse = nil
                                 progression.advanceTierAfterFill()
