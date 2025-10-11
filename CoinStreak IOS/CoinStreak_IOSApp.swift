@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreText
 
 @main
 struct CoinStreak_IOSApp: App {

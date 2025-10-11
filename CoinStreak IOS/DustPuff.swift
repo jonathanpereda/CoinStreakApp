@@ -79,11 +79,14 @@ private struct DustPuffCanvas: View, Animatable {
             let w: CGFloat = baseW * scale
             let h: CGFloat = baseH * scale
 
+            
+            #if DEBUG
             // DEBUG: center marker so we know we're drawing at the right spot
             context.fill(
                 Path(ellipseIn: CGRect(x: originX - 3, y: groundY - 2, width: 6, height: 4)),
                 with: .color(.green)
             )
+            #endif
 
             // Even ring of blobs around the coin base
             let n: Int = max(20, count)

@@ -7,6 +7,27 @@
 
 import SwiftUI
 
+
+private struct TextOutline: ViewModifier {
+    let color: Color
+    let width: CGFloat      // stroke thickness (px)
+
+    func body(content: Content) -> some View {
+        content
+            // four hard shadows = crisp outline (fast & iOS-safe)
+            .shadow(color: color, radius: 0, x:  width, y:  0)
+            .shadow(color: color, radius: 0, x: -width, y:  0)
+            .shadow(color: color, radius: 0, x:  0,    y:  width)
+            .shadow(color: color, radius: 0, x:  0,    y: -width)
+    }
+}
+
+private extension View {
+    func textOutline(_ color: Color = .black, width: CGFloat = 3) -> some View {
+        modifier(TextOutline(color: color, width: width))
+    }
+}
+
 // MARK: - App Phases
 private enum AppPhase { case choosing, preRoll, playing }
 
@@ -134,7 +155,7 @@ private struct SettleBounce: AnimatableModifier {
     }
 }
 
-// Central theme for each tier: backwall art + font (expand later with colors, sfx, etc.)
+// Central theme for each tier: backwall art + font
 private struct TierTheme {
     let backwall: String   // asset name for the backwall image
     let font: String       // display font name for StreakCounter
@@ -146,28 +167,54 @@ private func tierTheme(for tierName: String) -> TierTheme {
     switch tierName {
     case "Starter":
         return .init(backwall: "starter_backwall", font: "Herculanum",
-                     loop: nil, loopGain: 0.5)
+                     loop: "elevator_hum1", loopGain: 0.35)
     case "Lab":
-        return .init(backwall: "lab_backwall", font: "Beirut",
-                     loop: nil, loopGain: 0.5)
+        return .init(backwall: "lab_backwall1", font: "Beirut",
+                     loop: "lab_hum", loopGain: 0.45)
     case "Pond":
         return .init(backwall: "pond_backwall", font: "Chalkduster",
                      loop: "pond_mice", loopGain: 0.45)
-    case "Map3":
-        return .init(backwall: "map3_backwall", font: "Futura-Bold",
-                     loop: nil, loopGain: 0.5)
-    case "Map4":
-        return .init(backwall: "map4_backwall", font: "GillSans-Bold",
-                     loop: nil, loopGain: 0.5)
+    case "Brick":
+        return .init(backwall: "brick_backwall", font: "BlowBrush",
+                     loop: "brick_hum", loopGain: 0.45)
+    case "Chair_Room":
+        return .init(backwall: "chair_room_backwall", font: "DINCondensed-Bold",
+                     loop: "chair_room_hum", loopGain: 0.55)
+    case "Space":
+        return .init(backwall: "space_backwall", font: "Audiowide-Regular",
+                     loop: "song_4", loopGain: 0.15)
+    case "Backrooms":
+        return .init(backwall: "backrooms_backwall", font: "Arial-Black",
+                     loop: "backrooms_hum", loopGain: 0.5)
+    case "Underwater":
+        return .init(backwall: "underwater_backwall", font: "BebasNeue-Regular",
+                     loop: "underwater_hum", loopGain: 0.45)
     default:
         return .init(backwall: "starter_backwall", font: "Herculanum",
-                     loop: nil, loopGain: 0.5)
+                     loop: nil, loopGain: 0.30)
     }
 }
 
+private let BaseCounterPointSize: CGFloat = 184
+
+private func streakNumberScale(for fontName: String) -> CGFloat {
+    switch fontName {
+    case "Herculanum":              return 1.40
+    case "Beirut":                  return 1.78
+    case "Chalkduster":             return 1.15
+    case "PermanentMarker-Regular": return 1.10
+    case "DINCondensed-Bold":       return 1.14
+    case "Audiowide-Regular":       return 1.04
+    case "Arial-Black":             return 1.20
+    case "BebasNeue-Regular":       return 1.18
+    default:                        return 1.00
+    }
+}
+
+
 private func streakColor(_ v: Int) -> Color {
     switch v {
-    case ...2:      return Color("#6E6E6E") // neutral gray
+    case ...2:      return Color("#8A7763") // dusty brown
     case 3...4:     return Color("#5B8BF7") // vibrant blue
     case 5:         return Color("#00C2A8") // teal
     case 6:         return Color("#7DDA58") // green
@@ -197,43 +244,48 @@ private func updateTierLoop(_ theme: TierTheme) {
     }
 }
 
+private struct CounterSize: ViewModifier {
+    let fontName: String
+    let pointSize: CGFloat
+    func body(content: Content) -> some View {
+        content
+            .font(.custom(fontName, size: pointSize))
+            .minimumScaleFactor(0.75)
+            .allowsTightening(true)
+    }
+}
+
+private extension View {
+    func counterSized(fontName: String, pointSize: CGFloat) -> some View {
+        self.modifier(CounterSize(fontName: fontName, pointSize: pointSize))
+    }
+}
+
 
 @ViewBuilder
 private func streakNumberView(_ value: Int, fontName: String) -> some View {
-    let baseText =
-        Text("\(value)")
-            .font(.custom(fontName, size: 124))
+    let pointSize = BaseCounterPointSize              // <- fixed layout box
+    let scale = streakNumberScale(for: fontName)      // <- visual scale only
+    let plain = Text("\(value)")
 
     switch value {
-        case 0...8:
-            baseText.foregroundColor(streakColor(value))
-
-        case 9:
-            GlowText(text: baseText)                // Ember Glow (red)
-        case 10:
-            ShimmerText(text: baseText)             // Royal Shimmer (purple)
-        case 11:
-            AuroraText(text: baseText)              // Teal drift
-        case 12:
-            SurgeText(text: baseText)               // Lime inner pulse
-        case 13:
-            GoldSheenText(text: baseText)           // Metallic sheen
-        case 14:
-            ScanlineText(text: baseText)            // Sapphire scanline
-        case 15:
-            FluxText(text: baseText)                // Violet ↔ Magenta morph
-        case 16:
-            DiagonalDuoText(text: baseText)         // Fire & Ice diagonal
-        case 17:
-            ArcPulseText(text: baseText)             // Starlight glints
-        case 18:
-            ChromaticSplitText(text: baseText)      // RGB parallax
-        case 19:
-            HoloPrismText(text: baseText)           // Iridescent orbit
-        default: // 20+
-            LegendaryText(text: baseText)             // Legendary rainbow
+    case 0...8: plain.foregroundColor(streakColor(value)).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
+    case 9:  GlowText(text: plain).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
+    case 10: ShimmerText(text: plain).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
+    case 11: AuroraText(text: plain).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
+    case 12: SurgeText(text: plain).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
+    case 13: GoldSheenText(text: plain).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
+    case 14: ScanlineText(text: plain).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
+    case 15: FluxText(text: plain).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
+    case 16: DiagonalDuoText(text: plain).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
+    case 17: ArcPulseText(text: plain).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
+    case 18: ChromaticSplitText(text: plain).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
+    case 19: HoloPrismText(text: plain).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
+    default: LegendaryText(text: plain).counterSized(fontName: fontName, pointSize: pointSize).scaleEffect(scale, anchor: .center)
     }
 }
+
+
 
 private struct StreakCounter: View {
     let value: Int
@@ -255,6 +307,7 @@ private struct StreakCounter: View {
         }
     }
 }
+
 
 private func chosenIconName(_ face: Face?) -> String? {
     guard let f = face else { return nil }
@@ -345,15 +398,40 @@ struct ContentView: View {
     //DustPuff
     @State private var gameplayDustTrigger: Date? = nil
     @State private var backwallDustTrigger: Date? = nil
-    
+    @State private var doorDustTrigger: Date? = nil
+
     
     //Progress
     @StateObject private var progression = ProgressionManager.standard()
     @State private var barPulse: AwardPulse?
     @State private var barValueOverride: Double? = nil
     @State private var isTierTransitioning = false
+    @State private var deferCounterFadeInUntilClose = false
+    @State private var fontBelowName: String = "Herculanum"   // default matches Starter
+    @State private var fontAboveName: String = "Herculanum"
+    @State private var lastTierName: String = "Starter"
+    
+    //MuteSounds
+    @State private var showAudioMenu = false
+    @State private var sfxMutedUI   = SoundManager.shared.isSfxMuted
+    @State private var musicMutedUI = SoundManager.shared.isMusicMuted
+
+    
 
 
+    @ViewBuilder
+    private func streakLayer(fontName: String) -> some View {
+        VStack {
+            StreakCounter(value: store.currentStreak, fontName: fontName)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 75)
+                .padding(.horizontal, 20)
+            Spacer()
+        }
+        .allowsHitTesting(false)
+        .transition(.opacity)
+    }
+    
 
     var body: some View {
         GeometryReader { geo in
@@ -390,50 +468,52 @@ struct ContentView: View {
 
             ZStack {
                 
-                BackwallSwitcher(
-                    backwallName: theme.backwall,
-                    onDropImpact: { impact in
-                        backwallDustTrigger = impact
-                        let lifetime = 0.48 + 0.05
-                        DispatchQueue.main.asyncAfter(deadline: .now() + lifetime) {
-                            if backwallDustTrigger == impact { backwallDustTrigger = nil }
+                ElevatorSwitcher(
+                    currentBackwallName: theme.backwall,
+                    starterSceneName: "starter_backwall",
+                    doorLeftName: "starter_left",
+                    doorRightName: "starter_right",
+                    belowDoors: {
+                        // shows during open/close and when open
+                        streakLayer(fontName: fontBelowName)
+                    },
+                    aboveDoors: {
+                        // top copy you animate with counterOpacity
+                        streakLayer(fontName: fontAboveName)
+                            .opacity(counterOpacity)
+                    },
+                    onOpenEnded: {
+                        // nothing needed for fonts here
+                    },
+                    onCloseEnded: {
+                        // doors just finished closing on Starter → switch both to Starter font, then (optionally) fade top in
+                        let now = Date()
+                        doorDustTrigger = now
+                        // auto-clear after the effect ends (keep in sync with DoorDustLine.duration)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.60) {
+                            if doorDustTrigger == now { doorDustTrigger = nil }
+                        }   
+                        let starterFont = tierTheme(for: "Starter").font
+                        fontBelowName = starterFont
+                        fontAboveName = starterFont
+                        if deferCounterFadeInUntilClose {
+                            withAnimation(.easeInOut(duration: 0.25)) { counterOpacity = 1.0 }
+                            deferCounterFadeInUntilClose = false
                         }
                     }
-                ) {
-                    
-                    // Top overlay: Streak Counter
-                    if phase != .choosing {
-                        VStack {
-                            StreakCounter(
-                                value: store.currentStreak,
-                                fontName: theme.font
-                            )
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 75)
-                            .padding(.horizontal, 20)
-                            Spacer()
-                        }
-                        .opacity(counterOpacity)
+                )
+                
+                if let trig = doorDustTrigger {
+                    DoorDustLine.seamBurst(trigger: trig)
+                        .id(trig)                       // remount per trigger
+                        .frame(width: W, height: H)     // concrete size for Canvas
                         .allowsHitTesting(false)
-                        .zIndex(0.5)    // ← key line: between new wall (0) and outgoing wall (1)
-                        .transition(.opacity)
-                    }
                 }
-                
-                
-                if let trig = backwallDustTrigger {
-                    // pick a baseline just *behind* the table’s top edge
-                    let tableTopY = groundY - 35   // this is the same "ledge" baseline you already compute
-                    SceneDustPlume(
-                        trigger: trig,
-                        lipY: tableTopY,         // ← the lip you measured (e.g., groundY - 255)
-                        width: W,
-                        height: H,
-                        horizNarrow: 1.3,       // tweak to taste
-                        vertStretch: 1.9,
-                        windowWidthFrac: 0.60
-                    )
-                }
+
+
+
+
+
                 
                 Image("starter_table2")
                     .resizable()
@@ -572,34 +652,52 @@ struct ContentView: View {
             //Debug
             
             #if DEBUG
-            .overlay(alignment: .topTrailing) {
-                Button {
-                    store.chosenFace = nil
-                    store.currentStreak = 0
-                    store.clearRecent()
-                    didRestorePhase = false
-                    phase = .choosing
-                    gameplayOpacity = 0
-                    let tx = Transaction(animation: nil)
-                    withTransaction(tx) {
-                        barPulse = nil
-                        progression.debugResetToFirstTier()
+            .overlay(alignment: .topLeading) {
+                VStack(spacing: 6) {
+                    // ⬅︎ Reset button (mirrored arrow)
+                    Button("◀︎") {
+                        store.chosenFace = nil
+                        store.currentStreak = 0
+                        store.clearRecent()
+                        didRestorePhase = false
+                        phase = .choosing
+                        gameplayOpacity = 0
+                        withTransaction(Transaction(animation: nil)) {
+                            barPulse = nil
+                            progression.debugResetToFirstTier()
+                        }
                     }
-                }label: {
-                    Image(systemName: "gearshape.fill")    // SF Symbols gear icon
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 20, height: 20)      // small size
-                        .foregroundColor(.white)
-                        .padding(10)                       // tap target
-                        .background(Color.red.opacity(0.25))
-                        .clipShape(Circle())
-                        .shadow(radius: 3)
+                    .font(.system(size: 14, weight: .semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(Color.red.opacity(0.1))
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .shadow(radius: 2)
+
+                    // ▶︎ Advance button (existing tier skip)
+                    Button("▶︎") {
+                        func jumpToNextTier() {
+                            _ = progression.applyAward(len: 10_000)
+                            progression.advanceTierAfterFill()
+                        }
+                        jumpToNextTier()
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(Color.red.opacity(0.1))
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .shadow(radius: 2)
                 }
                 .padding(.top, 2)
-                .padding(.trailing, 2)
+                .padding(.leading, 8)
             }
             #endif
+
+
+
             
             
             // Choose overlay
@@ -620,8 +718,7 @@ struct ContentView: View {
                         flightAngle = 0; flightTarget = 0
 
                         // HIDE gameplay coin immediately (no animation) so it won't show before the drop
-                        let tx = Transaction(animation: nil)
-                        withTransaction(tx) { gameplayOpacity = 0 }
+                        withTransaction(Transaction(animation: nil)) { gameplayOpacity = 0 }
 
                         // Start pre-roll
                         withAnimation(.easeInOut(duration: 0.35)) {
@@ -672,6 +769,13 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 }
             }
+            .overlay(alignment: .topTrailing) {
+                AudioMenuButton()
+                    .padding(.top, 6)
+                    .padding(.trailing, 6)
+            }
+
+
 
 
         }
@@ -693,13 +797,43 @@ struct ContentView: View {
                 gameplayOpacity = 0
                 phase = .choosing
             }
+            let initialTheme = tierTheme(for: progression.currentTierName)
+            fontBelowName = initialTheme.font
+            fontAboveName = initialTheme.font
+            lastTierName = progression.currentTierName
             
             updateTierLoop(tierTheme(for: progression.currentTierName))
+            
+            sfxMutedUI   = SoundManager.shared.isSfxMuted
+            musicMutedUI = SoundManager.shared.isMusicMuted
+            
         }
         .onChange(of: progression.tierIndex) { _, _ in
             SoundManager.shared.play("scrape_1")
+            
+            
+            let newName  = progression.currentTierName
             let newTheme = tierTheme(for: progression.currentTierName)
+            let oldName  = lastTierName
+            
             updateTierLoop(newTheme)
+            
+            if oldName == "Starter" && newName != "Starter" {
+                // OPENING: switch the BELOW font immediately to the new tier
+                fontBelowName = newTheme.font
+                // top copy is fading out anyway, so no need to change fontAboveName now
+            } else if oldName != "Starter" && newName == "Starter" {
+                // CLOSING: keep BELOW font as the OLD tier during the close
+                // (do NOT change fontBelowName yet)
+                // after doors close, onCloseEnded will set both to Starter
+                deferCounterFadeInUntilClose = true  // if you're coordinating the top fade-in after close
+            } else {
+                // Shouldn't happen with alternating logic, but be robust
+                fontBelowName = newTheme.font
+                fontAboveName = newTheme.font
+            }
+
+            lastTierName = newName
         }
         /*.onChange(of: phase) { _, newPhase in
             if newPhase == .playing {
@@ -779,7 +913,7 @@ struct ContentView: View {
         let desired = Bool.random() ? "Heads" : "Tails"
         
         //DEV TEST
-        //let desired = "Heads"
+        //let desired = "Tails"
 
         // Capture takeoff state
         baseFaceAtLaunch = curState
@@ -917,13 +1051,17 @@ struct ContentView: View {
                                 DispatchQueue.main.asyncAfter(deadline: .now() + postCompletePause) {
                                     let tx = Transaction(animation: nil)
                                     withTransaction(tx) {
-                                        counterOpacity = 1.0
-                                        barValueOverride = nil   // go back to using the model value
+                                        // DO NOT set counterOpacity to 1 here anymore; we’ll do it after doors close.
+                                        barValueOverride = nil
                                     }
 
-                                    progression.advanceTierAfterFill() // model resets to empty; no visual snap now
+                                    // Tell the close callback to fade the counter back in on top when done.
+                                    deferCounterFadeInUntilClose = true
+
+                                    progression.advanceTierAfterFill() // triggers ElevatorSwitcher to CLOSE to Starter
                                     isTierTransitioning = false
                                 }
+
                             }
                         }
                     }

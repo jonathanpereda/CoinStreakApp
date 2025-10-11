@@ -1,42 +1,72 @@
-//
-//  ProgressionManager.swift
-//  CoinStreak
-//
-//  Created by Jonathan Pereda on 10/4/25.
-//
+// ProgressionManager.swift
 import SwiftUI
 
-/// Manages tiered progress bars and end-of-streak awards.
+/// Manages infinite, alternating levels with linear target growth:
+///   Starter → NonStarter1 → Starter → NonStarter2 → Starter → ...
 final class ProgressionManager: ObservableObject {
 
     // MARK: - Public, bindable state
-    @Published private(set) var tierIndex: Int {
-        didSet { UserDefaults.standard.set(tierIndex, forKey: Self.kTierIndex) }
+    @Published private(set) var levelIndex: Int {                // 0-based, infinite
+        didSet { UserDefaults.standard.set(levelIndex, forKey: Self.kLevelIndex) }
     }
-    @Published private(set) var currentProgress: Double {   // keep fractional to avoid rounding bias
+    @Published private(set) var currentProgress: Double {         // fractional, no spillover
         didSet { UserDefaults.standard.set(currentProgress, forKey: Self.kCurProgress) }
     }
 
-    // MARK: - Configuration
-    let tiers: [ProgressTier]            // immutable list for this app version
-    let tuning: ProgressTuning           // provides r(s)
-    
-    // Theme hook for later (background per tier)
-    var currentTierName: String { tiers[min(tierIndex, tiers.count - 1)].name }
-    var currentBarTotal: Int { tiers[min(tierIndex, tiers.count - 1)].barTotal }
-    var progressFraction: Double {
-        guard currentBarTotal > 0 else { return 0 }
-        return min(1.0, currentProgress / Double(currentBarTotal))
+    // MARK: - Config
+    struct LinearConfig {
+        let baseTargetFlips: Int   // e.g. 30
+        let incrementPerLevel: Int // e.g. 20 (so L0=30, L1=50, L2=70, ...)
     }
-    
-    // Applies award with NO spillover. Returns true if this fills the current bar.
+
+    let tuning: ProgressTuning                    // your r(s) function
+    let starterName: String = "Starter"
+    let nonStarterNames: [String] = ["Lab", "Pond", "Brick", "Chair_Room", "Space", "Backrooms", "Underwater"] // fixed, ordered (not random)
+    let linear: LinearConfig
+
+    // MARK: - Derived (compat layer to minimize UI changes)
+    var tierIndex: Int { levelIndex } // Back-compat: you were observing this
+    var currentTierName: String {
+        if levelIndex % 2 == 0 { return starterName }
+        let i = (levelIndex / 2) % max(nonStarterNames.count, 1)
+        return nonStarterNames[i]
+    }
+    var currentBarTotal: Int {
+        max(1, linear.baseTargetFlips + levelIndex * linear.incrementPerLevel)
+    }
+    var progressFraction: Double {
+        min(1.0, currentProgress / Double(currentBarTotal))
+    }
+
+    // MARK: - Init
+    static func standard() -> ProgressionManager {
+        // Keep your award curve
+        let tuning = ProgressTuning(p: 0.5, c: 1.7, gamma: 0.7)
+
+        // Tweak these two numbers to taste.
+        // Example: start at 30 flips, +20 per level → 30,50,70,90,110,...
+        let linear = LinearConfig(baseTargetFlips: 40, incrementPerLevel: 10)         //TUNE PROGRESSION
+
+        return ProgressionManager(tuning: tuning, linear: linear)
+    }
+
+    init(tuning: ProgressTuning, linear: LinearConfig) {
+        self.tuning = tuning
+        self.linear = linear
+        let savedLevel = UserDefaults.standard.integer(forKey: Self.kLevelIndex)
+        let savedProg  = UserDefaults.standard.object(forKey: Self.kCurProgress) as? Double ?? 0.0
+        self.levelIndex = max(0, savedLevel)
+        self.currentProgress = max(0.0, savedProg)
+    }
+
+    // MARK: - Award logic (end-of-streak only)
+    /// Applies award with NO spillover. Returns true if this fills the current bar.
     @discardableResult
     func applyAward(len: Int) -> Bool {
-        guard len > 0, !tiers.isEmpty, tierIndex < tiers.count else { return false }
+        guard len > 0 else { return false }
         let award = tuning.r(len)
         let needed = max(0.0, Double(currentBarTotal) - currentProgress)
         if needed > 0, award >= needed {
-            // Fill to the brim, but DO NOT advance tier yet (UI will animate it first)
             currentProgress += needed
             return true
         } else if award > 0 {
@@ -47,93 +77,22 @@ final class ProgressionManager: ObservableObject {
 
     /// Call AFTER the fill animation completes to advance/reset (still no spillover).
     func advanceTierAfterFill() {
-        guard tierIndex < tiers.count else { return }
         // Only act if we’re actually full
         guard currentProgress >= Double(currentBarTotal) else { return }
-        if tierIndex + 1 < tiers.count {
-            // Reset then move to next tier
-            currentProgress = 0.0
-            tierIndex += 1
-        } else {
-            // Final tier: stay full
-            tierIndex = tiers.count - 1
-            currentProgress = Double(currentBarTotal)
-        }
-    }
-    
-
-    // MARK: - Init (standard convenience)
-    static func standard() -> ProgressionManager {
-        // These should mirror your BuildBars tuning. Adjust as you rebalance.
-        let tuning = ProgressTuning(p: 0.5, c: 1.7, gamma: 0.7)
-        let specs: [ProgressTierSpec] = [
-            .init(name: "Starter",   targetFlips: 1),
-            .init(name: "Lab",   targetFlips: 1),
-            .init(name: "Pond",     targetFlips: 50),
-            .init(name: "Map3", targetFlips: 280),
-            .init(name: "Map4",   targetFlips: 380),
-        ]
-        let tiers = buildTiers(tuning: tuning, specs: specs)
-        return ProgressionManager(tuning: tuning, tiers: tiers)
+        currentProgress = 0.0
+        levelIndex &+= 1 // infinite
     }
 
-    init(tuning: ProgressTuning, tiers: [ProgressTier]) {
-        self.tuning = tuning
-        self.tiers  = tiers
-
-        let savedTier = UserDefaults.standard.integer(forKey: Self.kTierIndex)
-        let savedProg = UserDefaults.standard.object(forKey: Self.kCurProgress) as? Double ?? 0.0
-
-        self.tierIndex = min(max(0, savedTier), max(0, tiers.count - 1))
-        self.currentProgress = max(0.0, savedProg)
-    }
-
-    // MARK: - Award logic (end-of-streak only)
-    /// Call exactly once when a streak ends with length `len > 0`.
-    func awardForStreak(len: Int) {
-        guard len > 0, !tiers.isEmpty, tierIndex < tiers.count else { return }
-
-        let award = tuning.r(len)                // Double
-        let needed = max(0.0, Double(currentBarTotal) - currentProgress)
-
-        if award >= needed, needed > 0 {
-            // Fill this bar exactly, advance tier, and DROP any remainder
-            currentProgress += needed
-            onBarFilled()                        // advances and resets progress to 0 (or clamps at final)
-            // spillover intentionally discarded
-        } else if award > 0 {
-            // Partial fill within the same bar
-            currentProgress += award
-            currentProgress = min(currentProgress, Double(currentBarTotal))
-        }
-    }
-    
-    // Debug: reset to first tier with empty progress (and update persistence)
+    // Debug: reset to first level with empty progress
     func debugResetToFirstTier() {
         let defaults = UserDefaults.standard
-        defaults.set(0, forKey: Self.kTierIndex)
+        defaults.set(0, forKey: Self.kLevelIndex)
         defaults.set(0.0, forKey: Self.kCurProgress)
-        tierIndex = 0
+        levelIndex = 0
         currentProgress = 0.0
     }
 
-
-    // MARK: - Private helpers
-    private func onBarFilled() {
-        // TODO: hook SFX/FX here (bar complete)
-        if tierIndex + 1 < tiers.count {
-            // Advance to next tier and reset progress
-            currentProgress = 0.0
-            tierIndex += 1
-        } else {
-            // Final tier complete: clamp full and stop accumulating
-            tierIndex = tiers.count - 1
-            currentProgress = Double(currentBarTotal)
-        }
-    }
-
-    // MARK: - Persistence keys
-    private static let kTierIndex   = "pm_tierIndex_v1"
-    private static let kCurProgress = "pm_curProgress_v1"
+    // MARK: - Persistence keys (v2)
+    private static let kLevelIndex   = "pm_levelIndex_v2"
+    private static let kCurProgress  = "pm_curProgress_v2"
 }
-

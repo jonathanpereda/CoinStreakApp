@@ -23,11 +23,35 @@ final class SoundManager: NSObject {
     private let preferredSubdirectory = "Sounds"
 
     private override init() {}
+    
+    // MARK: - Mute preferences (persisted)
+    private let kSfxMutedKey   = "audio.sfx.muted"
+    private let kMusicMutedKey = "audio.music.muted"
+
+    private(set) var isSfxMuted: Bool = UserDefaults.standard.bool(forKey: "audio.sfx.muted") {
+        didSet { UserDefaults.standard.set(isSfxMuted, forKey: kSfxMutedKey) }
+    }
+    private(set) var isMusicMuted: Bool = UserDefaults.standard.bool(forKey: "audio.music.muted") {
+        didSet {
+            UserDefaults.standard.set(isMusicMuted, forKey: kMusicMutedKey)
+            applyMusicMuteNow()
+        }
+    }
+
+    // Exposed helpers
+    func setSfxMuted(_ v: Bool)   { isSfxMuted = v }
+    func setMusicMuted(_ v: Bool) { isMusicMuted = v }
+    func toggleSfxMuted()         { isSfxMuted.toggle() }
+    func toggleMusicMuted()       { isMusicMuted.toggle() }
+
+    
+    
 
     // MARK: - Public API
 
     /// Play a short one-shot SFX (e.g., launch_1, land_2).
     func play(_ name: String, volume: Float = 1.0) {
+        guard !isSfxMuted else { return }
         let url = resolveURL(for: name, ext: "wav")
               ?? resolveURL(for: name, ext: "mp3")   // ← add this
         guard let url else {
@@ -50,6 +74,7 @@ final class SoundManager: NSObject {
     /// Play the base tone at a given semitone offset (for streak buildup).
     /// 1 semitone = 100 cents. Example: semitoneOffset = 7 → a perfect fifth up.
     func playPitched(base name: String, semitoneOffset: Float, volume: Float = 0.4) {
+        guard !isSfxMuted else { return }
         guard let url = resolveURL(for: name, ext: "wav"),
               let file = try? AVAudioFile(forReading: url) else {
             print("⚠️ Missing pitched sound: \(name)")
@@ -160,6 +185,8 @@ extension SoundManager {
     private static var bgmPlayer: AVAudioPlayer?
     private static var bgmFaderTimer: Timer?
     private static var bgmCurrentName: String?
+    private static var bgmTargetVolume: Float = 0.8
+
 
     /// Start (or swap) a looping track with a gentle fade-in.
     /// Looks for .wav first (your default), then .mp3.
@@ -194,7 +221,8 @@ extension SoundManager {
 
             Self.bgmPlayer = player
             Self.bgmCurrentName = name
-            fade(to: volume, over: fadeIn)
+            Self.bgmTargetVolume = volume
+            fade(to: isMusicMuted ? 0.0 : volume, over: fadeIn)
         } catch {
             print("⚠️ Failed to start loop '\(name)': \(error)")
         }
@@ -213,13 +241,13 @@ extension SoundManager {
     /// Smooth volume ramp utility.
     private func fade(to target: Float, over duration: TimeInterval, completion: (() -> Void)? = nil) {
         Self.bgmFaderTimer?.invalidate()
-
         guard duration > 0, let player = Self.bgmPlayer else {
-            Self.bgmPlayer?.volume = target
+            Self.bgmPlayer?.volume = isMusicMuted ? 0.0 : target
             completion?()
             return
         }
 
+        let goal = isMusicMuted ? 0.0 : target
         let steps = 30
         let dt = duration / Double(steps)
         let start = player.volume
@@ -228,7 +256,7 @@ extension SoundManager {
         let timer = Timer.scheduledTimer(withTimeInterval: dt, repeats: true) { timer in
             i += 1
             let t = min(1.0, Double(i) / Double(steps))
-            player.volume = start + Float(t) * (target - start)
+            player.volume = start + Float(t) * (goal - start)
             if t >= 1.0 {
                 timer.invalidate()
                 completion?()
@@ -237,4 +265,12 @@ extension SoundManager {
         Self.bgmFaderTimer = timer
         RunLoop.main.add(timer, forMode: .common)
     }
+    
+    private func applyMusicMuteNow() {
+        guard let p = Self.bgmPlayer else { return }
+        // Snap instantly to current mute target (no ramp here)
+        p.volume = isMusicMuted ? 0.0 : Self.bgmTargetVolume
+    }
+
+
 }
