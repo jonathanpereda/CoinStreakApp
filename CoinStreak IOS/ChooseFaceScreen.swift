@@ -1,5 +1,88 @@
 import SwiftUI
 
+// === Sprite helpers (localized to the chooser) ===
+
+private enum CoinSide: String { case H = "Heads", T = "Tails" }
+
+private struct SpriteFlipPlan: Equatable {
+    let startFace: CoinSide
+    let endFace:   CoinSide
+    let halfTurns: Int       // number of half flips (HT or TH alternations)
+    let startTime: Date
+    let duration:  Double
+}
+
+// Your chooser uses the same “large alpha box” correction as gameplay.
+// If you change the main tweak later, mirror the numbers here.
+private struct CoinVisualTweak { let scale: CGFloat; let nudgeY: CGFloat }
+private let ChooseCoinTweak = CoinVisualTweak(scale: 2.7, nudgeY: -48)
+
+// Your atlas frame names are coin_HT_0001...0036 and coin_TH_0001...0036
+private func atlasFrameName(prefix: String, idx1based: Int) -> String {
+    String(format: "%@_%04d", prefix, idx1based)
+}
+
+// Build the alternating atlas sequence for N half-turns.
+// Skip the first frame of every run after the first so idle frames don't repeat.
+private func buildAtlasRun(start: CoinSide, halfTurns: Int) -> [(prefix: String, count: Int, skipFirst: Bool)] {
+    var list: [(String, Int, Bool)] = []
+    var cur = start
+    for i in 0..<halfTurns {
+        let next: CoinSide = (cur == .H) ? .T : .H
+        let prefix = (cur == .H && next == .T) ? "coin_HT" : "coin_TH"
+        list.append((prefix, 36, i > 0))
+        cur = next
+    }
+    return list
+}
+
+private func spriteFrameFor(plan: SpriteFlipPlan, now: Date) -> String {
+    let elapsed = max(0, now.timeIntervalSince(plan.startTime))
+    let t = min(elapsed, plan.duration)
+
+    let atlases = buildAtlasRun(start: plan.startFace, halfTurns: plan.halfTurns)
+    let totalFrames = atlases.reduce(0) { $0 + $1.count - ($1.skipFirst ? 1 : 0) }
+    let idx = Int(round((t / max(plan.duration, 0.0001)) * Double(totalFrames - 1)))
+
+    var remaining = idx
+    for (prefix, count, skip) in atlases {
+        let effective = count - (skip ? 1 : 0)
+        if remaining < effective {
+            let local1 = remaining + (skip ? 2 : 1)
+            return atlasFrameName(prefix: prefix, idx1based: local1)
+        }
+        remaining -= effective
+    }
+    // Fallback: last frame of the final sequence
+    let finalPrefix = (plan.endFace == .H) ? "coin_TH" : "coin_HT"
+    return atlasFrameName(prefix: finalPrefix, idx1based: 36)
+}
+
+// Minimal sprite image view mirroring your gameplay component
+private struct MiniSpriteCoinImage: View {
+    let plan: SpriteFlipPlan?
+    let idleFace: CoinSide
+    let width: CGFloat
+    let center: CGPoint   // container center in local coords
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let name = plan.map { spriteFrameFor(plan: $0, now: timeline.date) }
+                        ?? (idleFace == .H ? "coin_H" : "coin_T")
+
+            Image(name)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: width * ChooseCoinTweak.scale)
+                .position(x: center.x, y: center.y + ChooseCoinTweak.nudgeY)
+                .drawingGroup()
+        }
+    }
+}
+
+
+
 struct ChooseFaceScreen: View {
     @ObservedObject var store: FlipStore
 
@@ -16,7 +99,7 @@ struct ChooseFaceScreen: View {
 
     // 🔧 Easy tuning for this screen
     private let chooseSpacingMultiplier: CGFloat = 0    // horizontal gap = coinD * this
-    private let shadowYOffsetTweakChoose: CGFloat = 0   // per-screen nudge (pts)
+    private let shadowYOffsetTweakChoose: CGFloat = -10   // per-screen nudge (pts)
     private let coinsXOffset: CGFloat = 0               // move both coins left/right
     private let coinsYOffset: CGFloat = -50             // move both coins up/down
 
@@ -78,7 +161,7 @@ struct ChooseFaceScreen: View {
                 ) { choose($0) }
             }
             .frame(width: pairWidth, height: pairHeight, alignment: .center)
-            .position(x: W/2 + coinsXOffset, y: coinCenterY + coinsYOffset)
+            .position(x: W/2 + coinsXOffset, y: coinCenterY + coinsYOffset + 15)
         }
         .ignoresSafeArea()
         .statusBarHidden(true)
@@ -110,8 +193,7 @@ private struct PickableCoin: View {
     @State private var isAnimating = false
 
     // Flip
-    @State private var flightAngle: Double = 0
-    @State private var flightTarget: Double = 0
+    @State private var spritePlan: SpriteFlipPlan? = nil
 
     var body: some View {
         let jumpPx = max(180, UIScreen.main.bounds.height * 0.32)
@@ -134,8 +216,6 @@ private struct PickableCoin: View {
         let shadowY_center_topLocked = groundY + (shadowHcur / 2) + mainTweakScaled + shadowYOffsetTweakChoose
         let shadowLocalOffsetY = shadowY_center_topLocked - centerY
 
-        let base = (face == .Heads) ? "Heads" : "Tails"
-
         let containerW = coinD * 1.4
         let containerH = coinD * 1.6
 
@@ -146,12 +226,11 @@ private struct PickableCoin: View {
                 .blur(radius: shadowBlur)
                 .offset(x: 0, y: shadowLocalOffsetY)
 
-            FlippingCoin(
-                angle: flightAngle,
-                targetAngle: flightTarget,
-                baseFace: base,
+            MiniSpriteCoinImage(
+                plan: spritePlan,
+                idleFace: (face == .Heads ? .H : .T),
                 width: coinD,
-                position: .init(x: containerW / 2, y: containerH / 2)
+                center: .init(x: containerW / 2, y: containerH / 2)
             )
             .offset(y: y)
         }
@@ -172,11 +251,17 @@ private struct PickableCoin: View {
             let upDur = total * 0.42
             let jump: CGFloat = max(160, UIScreen.main.bounds.height * 0.28)
 
-            flightAngle = 0
-            flightTarget = 6 * 180 // 3 full flips
-            withAnimation(.linear(duration: total)) {
-                flightAngle = flightTarget
-            }
+            // === start sprite flip: 3 full flips = 6 half-turns ===
+            let startSide: CoinSide = (face == .Heads) ? .H : .T
+            let endSide:   CoinSide = (face == .Heads) ? .H : .T   // ends on same face for chooser flair
+            spritePlan = SpriteFlipPlan(
+                startFace: startSide,
+                endFace: endSide,
+                halfTurns: 6,
+                startTime: Date(),
+                duration: total
+            )
+            // Up & fade
             withAnimation(.easeOut(duration: upDur)) {
                 y = -jump
                 groupOpacity = 0
@@ -187,6 +272,8 @@ private struct PickableCoin: View {
 
             // Finish -> notify selection
             DispatchQueue.main.asyncAfter(deadline: .now() + total) {
+                // stop sprite playback so it returns to idle frame
+                spritePlan = nil
                 onChosen(face)
             }
         }

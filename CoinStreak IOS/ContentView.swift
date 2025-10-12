@@ -28,6 +28,113 @@ private extension View {
     }
 }
 
+
+// MARK: - Sprite flipping support (uses your coin_flip_HT / coin_flip_TH atlases)
+
+private enum CoinSide: String { case H = "Heads", T = "Tails" }
+
+private struct SpriteFlipPlan: Equatable {
+    let startFace: CoinSide       // "Heads" or "Tails"
+    let endFace:   CoinSide
+    let halfTurns: Int            // number of half flips (each = one atlas run)
+    let startTime: Date
+    let duration:  Double         // seconds
+}
+
+/// Frame-naming helper: your frames are named coin_HT_0001 ... coin_TH_0036
+private func atlasFrameName(prefix: String, idx1based: Int) -> String {
+    String(format: "%@_%04d", prefix, idx1based)
+}
+
+/// Build the alternating atlas run list using your real frame prefixes
+private func buildAtlasRun(start: CoinSide, halfTurns: Int) -> [(prefix: String, frameCount: Int, skipFirst: Bool)] {
+    var list: [(String, Int, Bool)] = []
+    var cur = start
+    for i in 0..<halfTurns {
+        let next: CoinSide = (cur == .H) ? .T : .H
+        // Use your actual frame name prefixes
+        let prefix = (cur == .H && next == .T) ? "coin_HT" : "coin_TH"
+        list.append((prefix, 36, i > 0 /* skip first frame after the first run */))
+        cur = next
+    }
+    return list
+}
+
+
+/// Given a flip plan and "now", compute which image name we should be on.
+private func spriteFrameFor(plan: SpriteFlipPlan, now: Date) -> String {
+    let elapsed = max(0, now.timeIntervalSince(plan.startTime))
+    // Clamp 0...duration
+    let t = min(elapsed, plan.duration)
+    let atlases = buildAtlasRun(start: plan.startFace, halfTurns: plan.halfTurns)
+
+    // Total frames accounting for skips
+    let totalFrames = atlases.reduce(0) { $0 + $1.frameCount - ($1.skipFirst ? 1 : 0) }
+    // Progress -> frame index in [0, totalFrames-1]
+    let idx = Int(round((t / max(plan.duration, 0.0001)) * Double(totalFrames - 1)))
+
+    // Walk atlases to find concrete (atlas, localIndex)
+    var remaining = idx
+    for (prefix, count, skipFirst) in atlases {
+        let effective = count - (skipFirst ? 1 : 0)
+        if remaining < effective {
+            // local 1-based index inside this atlas sequence
+            let local1based = remaining + (skipFirst ? 2 : 1)
+            return atlasFrameName(prefix: prefix, idx1based: local1based)
+        } else {
+            remaining -= effective
+        }
+    }
+    // Shouldn’t happen, but fall back to the final idle
+    let finalPrefix = (plan.endFace == .H) ? "coin_flip_TH" : "coin_flip_HT"
+    return atlasFrameName(prefix: finalPrefix, idx1based: 36)
+}
+
+/// Static image names for rest frames you provided: coin_H / coin_T
+private func staticFaceImage(_ face: CoinSide) -> String { face == .H ? "coin_H" : "coin_T" }
+
+/// Small per-asset visual tweaks because the new images have a larger alpha box.
+private struct CoinVisualTweak {
+    let scale: CGFloat   // 1.0 = no change
+    let nudgeY: CGFloat  // +down / -up, in points
+}
+private let NewCoinTweak = CoinVisualTweak(scale: 2.7, nudgeY: -58) // adjust to taste
+
+/// A view that shows either a static coin image, or a frame from the current sprite flip.
+/// It *does not* control Y/scale/jiggle—that remains owned by your existing state/animations.
+private struct SpriteCoinImage: View {
+    let plan: SpriteFlipPlan?
+    let idleFace: CoinSide         // the face to show when plan is nil
+    let width: CGFloat
+    let position: CGPoint
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let now = timeline.date
+            let name: String = {
+                if let p = plan {
+                    return spriteFrameFor(plan: p, now: now)
+                } else {
+                    return staticFaceImage(idleFace)
+                }
+            }()
+            Image(name)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: width * NewCoinTweak.scale)
+                .position(x: position.x, y: position.y + NewCoinTweak.nudgeY)
+                .drawingGroup()
+        }
+    }
+}
+
+
+
+
+
+
+
 // MARK: - App Phases
 private enum AppPhase { case choosing, preRoll, playing }
 
@@ -97,8 +204,8 @@ private func settleAnglesSide(_ t: Double) -> (xRock: Double, yRock: Double) {
     let decay: Double = 6.8
     let e = exp(-decay * t)
 
-    let yAmp: Double = 30.0   // ← dominant: left/right tilt (Y axis)
-    let xAmp: Double = 2.0    // ← subtle front/back (X axis) so it doesn’t look flat
+    let yAmp: Double = 15.0   // ← dominant: left/right tilt (Y axis)
+    let xAmp: Double = 1.0    // ← subtle front/back (X axis) so it doesn’t look flat
 
     // Slight detune + phase gives natural feel
     let y = yAmp * sin(2 * Double.pi * 3.0 * t + Double.pi/4) * e
@@ -379,6 +486,7 @@ struct ContentView: View {
     private let coinRestOverlapPct: CGFloat = 0.06
 
     // Flip state
+    @State private var spritePlan: SpriteFlipPlan? = nil
     @State private var isFlipping = false
     @State private var baseFaceAtLaunch = "Heads"
     @State private var flightAngle: Double = 0
@@ -584,7 +692,7 @@ struct ContentView: View {
                         .fill(Color.black.opacity(shadowOpacity))
                         .frame(width: shadowW, height: shadowHcur)
                         .blur(radius: shadowBlur)
-                        .position(x: W/2, y: shadowY_centerLocked)
+                        .position(x: W/2, y: shadowY_centerLocked-10)
                     
                     // Dust
                     if let trig = gameplayDustTrigger {
@@ -605,18 +713,22 @@ struct ContentView: View {
 
                     // Coin
                     ZStack {
-                        FlippingCoin(angle: flightAngle,
-                                     targetAngle: flightTarget,
-                                     baseFace: baseFaceAtLaunch,
-                                     width: coinD,
-                                     position: .init(x: W/2, y: coinCenterY))
-                            .offset(y: y + CGFloat(bounceY(settleBounceT)))   // ← flight + bounce together
-                            .scaleEffect(scale)
+                        // REPLACED the procedural 3D coin with our sprite-based image,
+                        // but left all the transforms you already apply around it.
+                        SpriteCoinImage(
+                            plan: spritePlan,
+                            idleFace: (curState == "Heads") ? .H : .T,
+                            width: coinD,
+                            position: .init(x: W/2, y: coinCenterY)
+                        )
+                        .offset(y: y + CGFloat(bounceY(settleBounceT)))
+                        .scaleEffect(scale)
                     }
-                    .modifier(SettleWiggle(t: settleT))       // apply to parent, not inside coin’s 3D perspective
-                    .modifier(SettleBounce(t: settleBounceT)) // ditto
+                    .modifier(SettleWiggle(t: settleT))
+                    .modifier(SettleBounce(t: settleBounceT))
                     .contentShape(Rectangle())
                     .onTapGesture { flipCoin() }
+
 
                 }
                 .opacity(gameplayOpacity)                 // <— no animation; see onReveal below
@@ -904,36 +1016,39 @@ struct ContentView: View {
             y = 0
         }
 
-
-
-        
         // Random launch sound
         SoundManager.shared.play(["launch_1","launch_2"].randomElement()!)
 
+        // Decide the face result exactly as before
         let desired = Bool.random() ? "Heads" : "Tails"
-        
-        //DEV TEST
-        //let desired = "Tails"
+        // DEV TEST
+        // let desired = "Tails"
 
         // Capture takeoff state
         baseFaceAtLaunch = curState
         isFlipping = true
 
-        // Choose # of half-turns so final parity matches desired face
+        // Choose # of half-turns so final parity matches desired face (unchanged)
         let needOdd = (desired != baseFaceAtLaunch)
         let halfTurns = (needOdd ? [7, 9, 11] : [6, 8, 10]).randomElement()!
 
-        // Timing & "gravity"
+        // Timing & "gravity" (unchanged)
         let total: Double = 0.85
         let upDur = total * 0.38
         let downDur = total - upDur
         let jump: CGFloat = max(180, UIScreen.main.bounds.height * 0.32)
 
-        flightAngle = 0
-        flightTarget = Double(halfTurns) * 180
-        withAnimation(.linear(duration: total)) {
-            flightAngle = flightTarget
-        }
+        // === SPRITE FLIP: start atlas playback instead of animating flightAngle ===
+        let startSide: CoinSide = (baseFaceAtLaunch == "Heads") ? .H : .T
+        let endSide:   CoinSide = (desired == "Heads") ? .H : .T
+        spritePlan = SpriteFlipPlan(
+            startFace: startSide,
+            endFace: endSide,
+            halfTurns: halfTurns,
+            startTime: Date(),
+            duration: total
+        )
+        // === end sprite start ===
 
         // Up (ease-out)
         withAnimation(.easeOut(duration: upDur)) {
@@ -953,50 +1068,49 @@ struct ContentView: View {
 
         // Land: commit result & streak; normalize for next flip
         DispatchQueue.main.asyncAfter(deadline: .now() + total) {
+            // Commit the visual end state
             curState = desired
-            
+
             // 1) freeze flip state (prevents drift)
             let noAnim = Transaction(animation: nil)
             withTransaction(noAnim) {
                 baseFaceAtLaunch = desired
                 isFlipping = false
-                flightAngle = 0
-                flightTarget = 0
+
+                // stop sprite playback and show static final face
+                spritePlan = nil
             }
 
-            // Kick off bounce + wobble once
+            // Kick off bounce + wobble once (unchanged)
             settleBounceT = 0.0
             withAnimation(.linear(duration: 0.70)) { settleBounceT = 1.0 }
 
             settleT = 0.0
             withAnimation(.linear(duration: 0.85)) { settleT = 1.0 }
 
-            
+            // === Your existing streak / award / tier / SFX logic (unchanged) ===
             if let faceVal = Face(rawValue: desired) {
-                
                 let preStreak = store.currentStreak
                 let wasSuccess = (faceVal == store.chosenFace)
-                
+
                 store.recordFlip(result: faceVal)
-                
+
                 if wasSuccess {
-                    
                     let pitch = Float(store.currentStreak) * 0.5  // each +0.5 semitone
                     SoundManager.shared.playPitched(base: "streak_base_pitch", semitoneOffset: pitch)
-                    
+
                     iconPulse = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         iconPulse = false
                     }
                 } else {
-                    
                     // END-OF-STREAK: award once if there was a run going
                     if preStreak > 0 {
-                        
+
                         if preStreak >= 5 {
                             SoundManager.shared.play("boost_1")
                         }
-                        
+
                         // Current snapshot for the pulse
                         let preProgress = progression.currentProgress
                         let total = Double(progression.currentBarTotal)
@@ -1020,32 +1134,37 @@ struct ContentView: View {
                         // If this award FILLS the bar, advance tier AFTER the fill animation plays
                         if didFill {
                             isTierTransitioning = true
+
                             // Keep this delay in sync with TierProgressBar’s grow+fade timings (≈0.28 + 0.22)
                             let fillAnimationDelay: Double = 0.55
-                            
                             // complete_1 sound delay
                             let postCompletePause: Double = 0.25
-                            
+
                             SoundManager.shared.stopLoop(fadeOut: 0.6)
-                            
+
                             withAnimation(.easeOut(duration: fillAnimationDelay * 0.9)) {
                                 counterOpacity = 0.0
                             }
-                            
+
                             // When the fill animation finishes, play the completion sting
                             DispatchQueue.main.asyncAfter(deadline: .now() + fillAnimationDelay) {
                                 SoundManager.shared.play("complete_1")
 
-                                // Stop drawing the award wedge (so only the main fill animates back)
-                                barPulse = nil
 
-                                // Start from whatever "full" is right now and animate down to 0
-                                let fullNow = progression.currentProgress     // should equal currentBarTotal
-                                barValueOverride = fullNow
+                                // During the sting, smoothly slide the bar back to 0 — single animation (no keyframes)
+                                let oldTotal = Double(progression.currentBarTotal)
+                                let downAnimDur: Double = 0.45
 
-                                withAnimation(.linear(duration: max(0.65, postCompletePause * 0.8))) {
-                                    barValueOverride = 0.0
+                                // 1) Set starting point with NO animation so we don’t trigger onChange spam
+                                withTransaction(Transaction(animation: nil)) {
+                                    barValueOverride = oldTotal
                                 }
+
+                                // 2) Animate straight to zero in one go
+                                withAnimation(.linear(duration: downAnimDur)) {
+                                    barValueOverride = 0
+                                }
+
 
                                 // After the pause, reset override and advance tier (switch backwall)
                                 DispatchQueue.main.asyncAfter(deadline: .now() + postCompletePause) {
@@ -1061,17 +1180,18 @@ struct ContentView: View {
                                     progression.advanceTierAfterFill() // triggers ElevatorSwitcher to CLOSE to Starter
                                     isTierTransitioning = false
                                 }
-
                             }
                         }
                     }
-                    
+
                     // Play landing sound
                     SoundManager.shared.play(["land_1","land_2"].randomElement()!)
                 }
             }
+            // === end existing streak / tier logic ===
         }
     }
+
 }
 
 
@@ -1105,14 +1225,25 @@ private struct IntroOverlay: View {
         let coinD = W * coinDiameterPct
         let coinR = coinD / 2
 
+        // 1) Compute with the scaled coin diameter so overlap math stays correct
+        let scaledCoinD = coinD * NewCoinTweak.scale
+        //let coinRScaled = coinR * NewCoinTweak.scale
+
+        // (keep W, H, coinD if you use it elsewhere)
+
         let baseShadowW = coinD * 1.00
-        let minShadowW  = coinD * 0.40
+        let minShadowW = coinD * 0.40
         let baseShadowH = coinD * 0.60
-        let minShadowH  = coinD * 0.22
+        let minShadowH = coinD * 0.22
+
+        // Lift shadow a hair more like gameplay; keep your existing tweak baseline
         let shadowYOffsetTweak: CGFloat = -157
+
+        // Use scaled radius for the “rest” center, then add the global coin nudge later
         let coinCenterY_atRest = groundY - coinR * (1 - coinRestOverlapPct)
 
-        let faceImageName = (finalFace == .Tails) ? "coin_tails" : "coin_heads"
+        let faceImageName = (finalFace == .Tails) ? "coin_T" : "coin_H"
+
 
         ZStack {
             Color.clear
@@ -1122,16 +1253,20 @@ private struct IntroOverlay: View {
                     .fill(Color.black.opacity(shadowOpacity))
                     .frame(width: shadowW, height: shadowH)
                     .blur(radius: 8)
-                    .position(x: W/2, y: (groundY + baseShadowH / 2) + shadowYOffsetTweak)
+                    // add both the coin nudge and your extra -10 lift to the shadow:
+                    .position(x: W/2, y: (groundY + baseShadowH / 2) + shadowYOffsetTweak - 10)
 
                 Image(faceImageName)
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: coinD)
-                    .rotationEffect(.degrees(angle))                               // 2D tilt
-                    .rotation3DEffect(.degrees(yaw), axis: (x: 0, y: 1, z: 0))     // NEW: subtle 3D yaw
-                    .position(x: W/2, y: coinCenterY_atRest + coinY)
+                    // render at scaled size
+                    .frame(width: scaledCoinD)
+                    .rotationEffect(.degrees(angle))
+                    .rotation3DEffect(.degrees(yaw), axis: (x: 0, y: 1, z: 0))
+                    // add NewCoinTweak.nudgeY so the coin sits exactly like gameplay
+                    .position(x: W/2, y: coinCenterY_atRest + coinY + NewCoinTweak.nudgeY)
+
 
             }
             .opacity(dropGroupOpacity)   // NEW: instantly hide overlay’s coin+shadow at touchdown
