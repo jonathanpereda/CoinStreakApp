@@ -118,7 +118,7 @@ extension DoorDustLine {
             count: 80,
             spread: 110,
             downDrift: 20,
-            thickness: 0,                  // keep obvious while testing; tune to ~2.5 later
+            thickness: 0,                  // For testing
             baseColor: .white.opacity(0.44),             // fully opaque while testing
             shadowColor: .black.opacity(0.2)
         )

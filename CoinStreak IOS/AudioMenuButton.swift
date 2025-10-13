@@ -48,7 +48,7 @@ struct AudioMenuButton: View {
                             .frame(width: buttonSize, height: buttonSize)
                             .contentShape(Circle())
 
-                        // Two stacked symbols; we animate opacity/scale so there’s no glyph jump
+                        // Two stacked symbols; animate opacity/scale so there’s no glyph jump
                         Image(systemName: "gearshape.fill")
                             .font(.system(size: iconSize, weight: .semibold))
                             .foregroundColor(.white)

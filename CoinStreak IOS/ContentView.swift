@@ -8,6 +8,11 @@
 import SwiftUI
 
 
+// MARK: - MISC
+
+private enum AppPhase { case choosing, preRoll, playing }
+
+///An optional text outline using shadows
 private struct TextOutline: ViewModifier {
     let color: Color
     let width: CGFloat      // stroke thickness (px)
@@ -21,7 +26,6 @@ private struct TextOutline: ViewModifier {
             .shadow(color: color, radius: 0, x:  0,    y: -width)
     }
 }
-
 private extension View {
     func textOutline(_ color: Color = .black, width: CGFloat = 3) -> some View {
         modifier(TextOutline(color: color, width: width))
@@ -29,7 +33,8 @@ private extension View {
 }
 
 
-// MARK: - Sprite flipping support (uses your coin_flip_HT / coin_flip_TH atlases)
+// MARK: - COIN FLIP ANIM
+///(uses coin_flip_HT / coin_flip_TH atlases)
 
 private enum CoinSide: String { case H = "Heads", T = "Tails" }
 
@@ -41,25 +46,24 @@ private struct SpriteFlipPlan: Equatable {
     let duration:  Double         // seconds
 }
 
-/// Frame-naming helper: your frames are named coin_HT_0001 ... coin_TH_0036
+/// Frame-naming helper: frames are named coin_HT_0001 ... coin_TH_0036
 private func atlasFrameName(prefix: String, idx1based: Int) -> String {
     String(format: "%@_%04d", prefix, idx1based)
 }
 
-/// Build the alternating atlas run list using your real frame prefixes
+/// Build the alternating atlas run list using real frame prefixes
 private func buildAtlasRun(start: CoinSide, halfTurns: Int) -> [(prefix: String, frameCount: Int, skipFirst: Bool)] {
     var list: [(String, Int, Bool)] = []
     var cur = start
     for i in 0..<halfTurns {
         let next: CoinSide = (cur == .H) ? .T : .H
-        // Use your actual frame name prefixes
+        // Use frame name prefixes
         let prefix = (cur == .H && next == .T) ? "coin_HT" : "coin_TH"
         list.append((prefix, 36, i > 0 /* skip first frame after the first run */))
         cur = next
     }
     return list
 }
-
 
 /// Given a flip plan and "now", compute which image name we should be on.
 private func spriteFrameFor(plan: SpriteFlipPlan, now: Date) -> String {
@@ -90,7 +94,7 @@ private func spriteFrameFor(plan: SpriteFlipPlan, now: Date) -> String {
     return atlasFrameName(prefix: finalPrefix, idx1based: 36)
 }
 
-/// Static image names for rest frames you provided: coin_H / coin_T
+/// Static image names for rest frames provided: coin_H / coin_T
 private func staticFaceImage(_ face: CoinSide) -> String { face == .H ? "coin_H" : "coin_T" }
 
 /// Small per-asset visual tweaks because the new images have a larger alpha box.
@@ -101,7 +105,7 @@ private struct CoinVisualTweak {
 private let NewCoinTweak = CoinVisualTweak(scale: 2.7, nudgeY: -58) // adjust to taste
 
 /// A view that shows either a static coin image, or a frame from the current sprite flip.
-/// It *does not* control Y/scale/jiggle—that remains owned by your existing state/animations.
+/// It does not control Y/scale/jiggle—that remains owned by the existing state/animations.
 private struct SpriteCoinImage: View {
     let plan: SpriteFlipPlan?
     let idleFace: CoinSide         // the face to show when plan is nil
@@ -129,17 +133,68 @@ private struct SpriteCoinImage: View {
     }
 }
 
+// t: 0 → 1
+private func settleAnglesSide(_ t: Double) -> (xRock: Double, yRock: Double) {
+    // Slower decay and clear side tilt
+    let decay: Double = 6.8
+    let e = exp(-decay * t)
 
+    let yAmp: Double = 15.0   // ← dominant: left/right tilt (Y axis)
+    let xAmp: Double = 1.0    // ← subtle front/back (X axis) so it doesn’t look flat
 
+    // Slight detune + phase gives natural feel
+    let y = yAmp * sin(2 * Double.pi * 3.0 * t + Double.pi/4) * e
+    let x = xAmp * sin(2 * Double.pi * 3.4 * t) * e
+    return (x, y)
+}
 
+private struct SettleWiggle: AnimatableModifier {
+    var t: Double
+    var animatableData: Double {
+        get { t }
+        set { t = newValue }
+    }
+    func body(content: Content) -> some View {
+        let ang = settleAnglesSide(t)   // (xRock, yRock)
+        content
+            // subtle front/back
+            .rotation3DEffect(.degrees(ang.xRock),
+                              axis: (x: 1, y: 0, z: 0),
+                              anchor: .bottom,
+                              perspective: 0.45)
+            // dominant left/right rock
+            .rotation3DEffect(.degrees(ang.yRock),
+                              axis: (x: 0, y: 1, z: 0),
+                              anchor: .bottom,
+                              perspective: 0.45)
+    }
+}
 
+private func bounceY(_ t: Double) -> Double {
+    // t: 0→1; return NEGATIVE (upwards) pixels; 0 = rest
+    // Using |sin| so each lobe is an “upward tap”, then back to 0.
+    let decay = 6.5         // larger = dies faster
+    let freq  = 3.0         // ~3 taps across t∈[0,1]
+    let amp   = 10.0        // max height in px for first tap
 
+    let envelope = exp(-decay * t)
+    let pulses   = abs(sin(2 * Double.pi * freq * t))  // 0→1→0 lobes
+    return -(amp * envelope * pulses)                  // negative y = up
+}
 
-// MARK: - App Phases
-private enum AppPhase { case choosing, preRoll, playing }
+private struct SettleBounce: AnimatableModifier {
+    var t: Double                        // 0→1
+    var animatableData: Double {
+        get { t }
+        set { t = newValue }
+    }
+    func body(content: Content) -> some View {
+        content.offset(y: CGFloat(bounceY(t)))
+    }
+}
 
-// MARK: - Animatable coin that swaps face based on the live angle
-struct FlippingCoin: View, Animatable {
+///OLD coin flipping animation
+/*struct FlippingCoin: View, Animatable {
     var angle: Double
     var targetAngle: Double
     var baseFace: String
@@ -197,79 +252,18 @@ struct FlippingCoin: View, Animatable {
             .animation(nil, value: face)
     }
 }
-
-// t: 0 → 1
-private func settleAnglesSide(_ t: Double) -> (xRock: Double, yRock: Double) {
-    // Slower decay and clear side tilt
-    let decay: Double = 6.8
-    let e = exp(-decay * t)
-
-    let yAmp: Double = 15.0   // ← dominant: left/right tilt (Y axis)
-    let xAmp: Double = 1.0    // ← subtle front/back (X axis) so it doesn’t look flat
-
-    // Slight detune + phase gives natural feel
-    let y = yAmp * sin(2 * Double.pi * 3.0 * t + Double.pi/4) * e
-    let x = xAmp * sin(2 * Double.pi * 3.4 * t) * e
-    return (x, y)
-}
+*/
 
 
-
-private struct SettleWiggle: AnimatableModifier {
-    var t: Double
-    var animatableData: Double {
-        get { t }
-        set { t = newValue }
-    }
-    func body(content: Content) -> some View {
-        let ang = settleAnglesSide(t)   // your (xRock, yRock)
-        content
-            // subtle front/back
-            .rotation3DEffect(.degrees(ang.xRock),
-                              axis: (x: 1, y: 0, z: 0),
-                              anchor: .bottom,
-                              perspective: 0.45)  // ← add perspective here
-            // dominant left/right rock
-            .rotation3DEffect(.degrees(ang.yRock),
-                              axis: (x: 0, y: 1, z: 0),
-                              anchor: .bottom,
-                              perspective: 0.45)  // ← and here
-    }
-}
-
-
-
-private func bounceY(_ t: Double) -> Double {
-    // t: 0→1; return NEGATIVE (upwards) pixels; 0 = rest
-    // Using |sin| so each lobe is an “upward tap”, then back to 0.
-    let decay = 6.5         // larger = dies faster
-    let freq  = 3.0         // ~3 taps across t∈[0,1]
-    let amp   = 10.0        // max height in px for first tap
-
-    let envelope = exp(-decay * t)
-    let pulses   = abs(sin(2 * Double.pi * freq * t))  // 0→1→0 lobes
-    return -(amp * envelope * pulses)                  // negative y = up
-}
-
-private struct SettleBounce: AnimatableModifier {
-    var t: Double                        // 0→1
-    var animatableData: Double {
-        get { t }
-        set { t = newValue }
-    }
-    func body(content: Content) -> some View {
-        content.offset(y: CGFloat(bounceY(t)))
-    }
-}
-
-// Central theme for each tier: backwall art + font
+// MARK: TIER THEMES
+///Central theme for each tier: backwall art + font
 private struct TierTheme {
     let backwall: String   // asset name for the backwall image
     let font: String       // display font name for StreakCounter
     let loop: String?      // OPTIONAL: audio file name in bundle (no extension)
     let loopGain: Float    // 0.0–1.0
 }
-
+//********************IMPORTANT NOTE: WHEN ADDING A NEW MAP, MAKE SURE TO UPDATE PROGRESSION MANAGER*********************
 private func tierTheme(for tierName: String) -> TierTheme {
     switch tierName {
     case "Starter":
@@ -301,9 +295,9 @@ private func tierTheme(for tierName: String) -> TierTheme {
                      loop: nil, loopGain: 0.30)
     }
 }
-
+//Base font size
 private let BaseCounterPointSize: CGFloat = 184
-
+//Font rescale
 private func streakNumberScale(for fontName: String) -> CGFloat {
     switch fontName {
     case "Herculanum":              return 1.40
@@ -318,7 +312,17 @@ private func streakNumberScale(for fontName: String) -> CGFloat {
     }
 }
 
+private func updateTierLoop(_ theme: TierTheme) {
+    if let loopName = theme.loop {
+        SoundManager.shared.startLoop(named: loopName, volume: theme.loopGain, fadeIn: 0.8)
+    } else {
+        // No loop for this tier
+        SoundManager.shared.stopLoop(fadeOut: 0.5)
+    }
+}
 
+
+// MARK: STREAK COUNTER
 private func streakColor(_ v: Int) -> Color {
     switch v {
     case ...2:      return Color("#8A7763") // dusty brown
@@ -342,15 +346,6 @@ private func streakColor(_ v: Int) -> Color {
     }
 }
 
-private func updateTierLoop(_ theme: TierTheme) {
-    if let loopName = theme.loop {
-        SoundManager.shared.startLoop(named: loopName, volume: theme.loopGain, fadeIn: 0.8)
-    } else {
-        // No loop for this tier
-        SoundManager.shared.stopLoop(fadeOut: 0.5)
-    }
-}
-
 private struct CounterSize: ViewModifier {
     let fontName: String
     let pointSize: CGFloat
@@ -367,7 +362,6 @@ private extension View {
         self.modifier(CounterSize(fontName: fontName, pointSize: pointSize))
     }
 }
-
 
 @ViewBuilder
 private func streakNumberView(_ value: Int, fontName: String) -> some View {
@@ -392,8 +386,6 @@ private func streakNumberView(_ value: Int, fontName: String) -> some View {
     }
 }
 
-
-
 private struct StreakCounter: View {
     let value: Int
     let fontName: String
@@ -416,6 +408,7 @@ private struct StreakCounter: View {
 }
 
 
+// MARK: RECENT FLIPS COLUMN
 private func chosenIconName(_ face: Face?) -> String? {
     guard let f = face else { return nil }
     return (f == .Tails) ? "t_icon" : "h_icon"
@@ -468,7 +461,7 @@ private struct RecentFlipsColumn: View {
 
 
 
-
+// MARK: CONTENT VIEW
 
 struct ContentView: View {
     @StateObject private var store = FlipStore()
@@ -491,7 +484,7 @@ struct ContentView: View {
     @State private var baseFaceAtLaunch = "Heads"
     @State private var flightAngle: Double = 0
     @State private var flightTarget: Double = 0
-    @State private var settleT: Double = 1.0   // 1 = idle (no wobble), we animate 0 -> 1 on land
+    @State private var settleT: Double = 1.0   // 1 = idle (no wobble), animate 0 -> 1 on land
     @State private var bounceGen: Int = 0   // cancels any in-flight bounce sequence
     @State private var settleBounceT: Double = 1.0   // 0→1 drives bounce curve; 1 = idle
 
@@ -508,7 +501,6 @@ struct ContentView: View {
     @State private var backwallDustTrigger: Date? = nil
     @State private var doorDustTrigger: Date? = nil
 
-    
     //Progress
     @StateObject private var progression = ProgressionManager.standard()
     @State private var barPulse: AwardPulse?
@@ -524,7 +516,6 @@ struct ContentView: View {
     @State private var sfxMutedUI   = SoundManager.shared.isSfxMuted
     @State private var musicMutedUI = SoundManager.shared.isMusicMuted
 
-    
 
 
     @ViewBuilder
@@ -586,7 +577,7 @@ struct ContentView: View {
                         streakLayer(fontName: fontBelowName)
                     },
                     aboveDoors: {
-                        // top copy you animate with counterOpacity
+                        // top copy, animate with counterOpacity
                         streakLayer(fontName: fontAboveName)
                             .opacity(counterOpacity)
                     },
@@ -618,18 +609,12 @@ struct ContentView: View {
                         .allowsHitTesting(false)
                 }
 
-
-
-
-
-                
                 Image("starter_table2")
                     .resizable()
                     .scaledToFill()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
                     .ignoresSafeArea()
-                
                 
                 // HUD: progress bar + chosen-face badge (single instance, top of stack)
                 if phase != .choosing, let icon = chosenIconName(store.chosenFace) {
@@ -678,12 +663,10 @@ struct ContentView: View {
                     .padding(.bottom, geo.safeAreaInsets.bottom + 18)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .allowsHitTesting(false)
-                    .zIndex(50)                // keep comfortably above table/gameplay
+                    .zIndex(50)                // keep above table/gameplay
                     .transition(.opacity)
                 }
 
-                
-                
 
                 // Gameplay shadow + coin are always in the tree; opacity gates visibility.
                 Group {
@@ -702,7 +685,7 @@ struct ContentView: View {
                             groundY: (groundY + baseShadowH / 2) + shadowYOffsetTweak-52,
                             duration: 0.48,
                             count: 16,
-                            baseColor: Color.white.opacity(0.85),   // or match your palette
+                            baseColor: Color.white.opacity(0.85),
                             shadowColor: Color.black.opacity(0.22),
                             seed: 42
                         )
@@ -713,8 +696,6 @@ struct ContentView: View {
 
                     // Coin
                     ZStack {
-                        // REPLACED the procedural 3D coin with our sprite-based image,
-                        // but left all the transforms you already apply around it.
                         SpriteCoinImage(
                             plan: spritePlan,
                             idleFace: (curState == "Heads") ? .H : .T,
@@ -736,11 +717,10 @@ struct ContentView: View {
 
 
 
-                
                 // Recent flips pillar: bottom fixed at a baseline, grows upward
                 if phase != .choosing, !store.recent.isEmpty {
-                    // Choose where the BOTTOM should live (0.0 = top, 1.0 = bottom)
-                    let baselineYPct: CGFloat = 0.30   // mid-left baseline; tweak to taste
+                    // Where the BOTTOM should live (0.0 = top, 1.0 = bottom)
+                    let baselineYPct: CGFloat = 0.30   // mid-left baseline
                     let baselineY = geo.size.height * baselineYPct
 
                     ZStack(alignment: .bottomLeading) {
@@ -761,12 +741,12 @@ struct ContentView: View {
             .ignoresSafeArea()
 
 
-            //Debug
+            // MARK: DEBUG BUTTONS
             
             #if DEBUG
             .overlay(alignment: .topLeading) {
                 VStack(spacing: 6) {
-                    // ⬅︎ Reset button (mirrored arrow)
+                    // ⬅︎ Reset button
                     Button("◀︎") {
                         store.chosenFace = nil
                         store.currentStreak = 0
@@ -787,7 +767,7 @@ struct ContentView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .shadow(radius: 2)
 
-                    // ▶︎ Advance button (existing tier skip)
+                    // ▶︎ Advance button
                     Button("▶︎") {
                         func jumpToNextTier() {
                             _ = progression.applyAward(len: 10_000)
@@ -808,11 +788,60 @@ struct ContentView: View {
             }
             #endif
 
+            #if TRAILER_RESET
+            .overlay(alignment: .topLeading) {
+                // Invisible but LARGE tap zones
+                let tapSize = CGSize(width: 72, height: 72)   // adjust to taste
+                let tapGap: CGFloat = 12
+
+                VStack(alignment: .leading, spacing: tapGap) {
+                    // ◀︎ Reset to beginning
+                    Button(action: {
+                        store.chosenFace = nil
+                        store.currentStreak = 0
+                        store.clearRecent()
+                        didRestorePhase = false
+                        phase = .choosing
+                        gameplayOpacity = 0
+                        withTransaction(Transaction(animation: nil)) {
+                            barPulse = nil
+                            progression.debugResetToFirstTier()
+                        }
+                    }) {
+                        Color.clear
+                            .frame(width: tapSize.width, height: tapSize.height)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(0.01)                 // invisible but hit-testable
+                    .accessibilityHidden(true)
+
+                    // ▶︎ Advance tier
+                    Button(action: {
+                        func jumpToNextTier() {
+                            _ = progression.applyAward(len: 10_000)
+                            progression.advanceTierAfterFill()
+                        }
+                        jumpToNextTier()
+                    }) {
+                        Color.clear
+                            .frame(width: tapSize.width, height: tapSize.height)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(0.01)
+                    .accessibilityHidden(true)
+                }
+                .padding(.top, 10)
+                .padding(.leading, 10)
+                .allowsHitTesting(true)
+                .zIndex(999) // ensure taps aren’t blocked by views underneath
+            }
+            #endif
 
 
             
-            
-            // Choose overlay
+            // Choose coin overlay
             .overlay {
                 if phase == .choosing {
                     ChooseFaceScreen(
@@ -938,24 +967,15 @@ struct ContentView: View {
                 // CLOSING: keep BELOW font as the OLD tier during the close
                 // (do NOT change fontBelowName yet)
                 // after doors close, onCloseEnded will set both to Starter
-                deferCounterFadeInUntilClose = true  // if you're coordinating the top fade-in after close
+                deferCounterFadeInUntilClose = true
             } else {
-                // Shouldn't happen with alternating logic, but be robust
+                // Shouldn't happen with alternating logic, but incase:
                 fontBelowName = newTheme.font
                 fontAboveName = newTheme.font
             }
 
             lastTierName = newName
         }
-        /*.onChange(of: phase) { _, newPhase in
-            if newPhase == .playing {
-                updateTierLoop(tierTheme(for: progression.currentTierName))
-            } else {
-                SoundManager.shared.stopLoop(fadeOut: 0.4)
-            }
-        }*/
-
-
 
     }
     
@@ -1004,7 +1024,7 @@ struct ContentView: View {
     }
 
 
-    // MARK: - Flip logic
+    // MARK: - FLIP LOGIC
     func flipCoin() {
         guard phase == .playing else { return }   // block until pre-roll done
         guard !isFlipping && !isTierTransitioning else { return }
@@ -1019,8 +1039,14 @@ struct ContentView: View {
         // Random launch sound
         SoundManager.shared.play(["launch_1","launch_2"].randomElement()!)
 
-        // Decide the face result exactly as before
+        // Decide the face result
+        #if TRAILER_RESET
+        // Trailer build: 2/3 chance Heads, 1/3 Tails
+        let desired = (Int.random(in: 0..<3) < 2) ? "Heads" : "Tails"
+        #else
         let desired = Bool.random() ? "Heads" : "Tails"
+        #endif
+        
         // DEV TEST
         // let desired = "Tails"
 
@@ -1028,11 +1054,11 @@ struct ContentView: View {
         baseFaceAtLaunch = curState
         isFlipping = true
 
-        // Choose # of half-turns so final parity matches desired face (unchanged)
+        // Choose # of half-turns so final parity matches desired face
         let needOdd = (desired != baseFaceAtLaunch)
         let halfTurns = (needOdd ? [7, 9, 11] : [6, 8, 10]).randomElement()!
 
-        // Timing & "gravity" (unchanged)
+        // Timing & "gravity"
         let total: Double = 0.85
         let upDur = total * 0.38
         let downDur = total - upDur
@@ -1071,7 +1097,7 @@ struct ContentView: View {
             // Commit the visual end state
             curState = desired
 
-            // 1) freeze flip state (prevents drift)
+            //freeze flip state (prevents drift)
             let noAnim = Transaction(animation: nil)
             withTransaction(noAnim) {
                 baseFaceAtLaunch = desired
@@ -1081,14 +1107,14 @@ struct ContentView: View {
                 spritePlan = nil
             }
 
-            // Kick off bounce + wobble once (unchanged)
+            // Kick off bounce + wobble once
             settleBounceT = 0.0
             withAnimation(.linear(duration: 0.70)) { settleBounceT = 1.0 }
 
             settleT = 0.0
             withAnimation(.linear(duration: 0.85)) { settleT = 1.0 }
 
-            // === Your existing streak / award / tier / SFX logic (unchanged) ===
+            // === streak / award / tier / SFX logic ===
             if let faceVal = Face(rawValue: desired) {
                 let preStreak = store.currentStreak
                 let wasSuccess = (faceVal == store.chosenFace)
@@ -1165,15 +1191,12 @@ struct ContentView: View {
                                     barValueOverride = 0
                                 }
 
-
                                 // After the pause, reset override and advance tier (switch backwall)
                                 DispatchQueue.main.asyncAfter(deadline: .now() + postCompletePause) {
                                     let tx = Transaction(animation: nil)
                                     withTransaction(tx) {
-                                        // DO NOT set counterOpacity to 1 here anymore; we’ll do it after doors close.
                                         barValueOverride = nil
                                     }
-
                                     // Tell the close callback to fade the counter back in on top when done.
                                     deferCounterFadeInUntilClose = true
 
@@ -1188,7 +1211,6 @@ struct ContentView: View {
                     SoundManager.shared.play(["land_1","land_2"].randomElement()!)
                 }
             }
-            // === end existing streak / tier logic ===
         }
     }
 
@@ -1197,7 +1219,7 @@ struct ContentView: View {
 
 #Preview { ContentView() }
 
-// MARK: - Intro overlay (stronger mid-air tilt; no bounce; reveal gameplay at touchdown)
+// MARK: - HERO DROP ANIM (stronger mid-air tilt; no bounce; reveal gameplay at touchdown)
 private struct IntroOverlay: View {
     let groundY: CGFloat
     let screenSize: CGSize
@@ -1229,14 +1251,12 @@ private struct IntroOverlay: View {
         let scaledCoinD = coinD * NewCoinTweak.scale
         //let coinRScaled = coinR * NewCoinTweak.scale
 
-        // (keep W, H, coinD if you use it elsewhere)
-
         let baseShadowW = coinD * 1.00
         let minShadowW = coinD * 0.40
         let baseShadowH = coinD * 0.60
         let minShadowH = coinD * 0.22
 
-        // Lift shadow a hair more like gameplay; keep your existing tweak baseline
+        // Lift shadow a hair more like gameplay
         let shadowYOffsetTweak: CGFloat = -157
 
         // Use scaled radius for the “rest” center, then add the global coin nudge later
@@ -1253,7 +1273,7 @@ private struct IntroOverlay: View {
                     .fill(Color.black.opacity(shadowOpacity))
                     .frame(width: shadowW, height: shadowH)
                     .blur(radius: 8)
-                    // add both the coin nudge and your extra -10 lift to the shadow:
+                    // add both the coin nudge and extra -10 lift to the shadow:
                     .position(x: W/2, y: (groundY + baseShadowH / 2) + shadowYOffsetTweak - 10)
 
                 Image(faceImageName)
@@ -1269,7 +1289,7 @@ private struct IntroOverlay: View {
 
 
             }
-            .opacity(dropGroupOpacity)   // NEW: instantly hide overlay’s coin+shadow at touchdown
+            .opacity(dropGroupOpacity)   // instantly hide overlay’s coin+shadow at touchdown
         }
         .opacity(overlayOpacity)
         .onAppear {

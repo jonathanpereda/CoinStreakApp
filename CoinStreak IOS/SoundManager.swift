@@ -18,8 +18,6 @@ final class SoundManager: NSObject {
     private var playerNode: AVAudioPlayerNode?
     private var pitchNode: AVAudioUnitTimePitch?
 
-    // If you’re using a blue folder named "Sounds", leave this as "Sounds".
-    // If not, no worries — the resolver falls back to bundle root automatically.
     private let preferredSubdirectory = "Sounds"
 
     private override init() {}
@@ -49,13 +47,13 @@ final class SoundManager: NSObject {
 
     // MARK: - Public API
 
-    /// Play a short one-shot SFX (e.g., launch_1, land_2).
+    /// Play a short one-shot SFX
     func play(_ name: String, volume: Float = 1.0) {
         guard !isSfxMuted else { return }
         let url = resolveURL(for: name, ext: "wav")
-              ?? resolveURL(for: name, ext: "mp3")   // ← add this
+              ?? resolveURL(for: name, ext: "mp3")
         guard let url else {
-            print("⚠️ Missing sound: \(name) (.wav/.mp3 not found)")
+            print("Missing sound: \(name) (.wav/.mp3 not found)")
             return
         }
         do {
@@ -66,25 +64,25 @@ final class SoundManager: NSObject {
             players[name] = p
             p.delegate = self
         } catch {
-            print("🔈 Sound error (\(name)): \(error.localizedDescription)")
+            print("Sound error (\(name)): \(error.localizedDescription)")
         }
     }
 
 
     /// Play the base tone at a given semitone offset (for streak buildup).
-    /// 1 semitone = 100 cents. Example: semitoneOffset = 7 → a perfect fifth up.
+    /// 1 semitone = 100 cents.
     func playPitched(base name: String, semitoneOffset: Float, volume: Float = 0.4) {
         guard !isSfxMuted else { return }
         guard let url = resolveURL(for: name, ext: "wav"),
               let file = try? AVAudioFile(forReading: url) else {
-            print("⚠️ Missing pitched sound: \(name)")
+            print("Missing pitched sound: \(name)")
             return
         }
 
-        // Activate session (important for AVAudioEngine)
+        // Activate session
         ensureAudioSessionActive()
 
-        // Rebuild engine fresh for simplicity
+        // Rebuild engine fresh
         engine?.stop()
         engine = AVAudioEngine()
         playerNode = AVAudioPlayerNode()
@@ -103,20 +101,20 @@ final class SoundManager: NSObject {
         engine.connect(pitchNode, to: engine.mainMixerNode, format: format)
         engine.mainMixerNode.outputVolume = volume
 
-        // Read file into buffer (more reliable for very short clips)
+        // Read file into buffer
         guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
                                             frameCapacity: AVAudioFrameCount(file.length)) else { return }
         do {
             try file.read(into: buffer)
         } catch {
-            print("🎛️ Buffer read error: \(error.localizedDescription)")
+            print("Buffer read error: \(error.localizedDescription)")
             return
         }
 
         do {
             try engine.start()
         } catch {
-            print("🎛️ Engine start error: \(error.localizedDescription)")
+            print("Engine start error: \(error.localizedDescription)")
             return
         }
 
@@ -133,25 +131,26 @@ final class SoundManager: NSObject {
 
 
     // MARK: - Debug helpers
-
-    /// Call once (e.g., in onAppear) to see what’s actually packaged.
+    /*
+    /// Call once to see what’s actually packaged.
     func debugListSounds() {
         if let dir = Bundle.main.url(forResource: nil, withExtension: nil, subdirectory: preferredSubdirectory),
            let contents = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
-            print("📦 \(preferredSubdirectory)/:", contents.map(\.lastPathComponent))
+            print("\(preferredSubdirectory)/:", contents.map(\.lastPathComponent))
         } else {
             print("ℹ️ No \(preferredSubdirectory)/ folder found in bundle; files may be at root.")
             if let root = Bundle.main.resourceURL,
                let contents = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) {
                 let wavs = contents.filter { $0.pathExtension.lowercased() == "wav" }
-                print("📦 Bundle root wavs:", wavs.map(\.lastPathComponent))
+                print("Bundle root wavs:", wavs.map(\.lastPathComponent))
             }
         }
     }
+     */
 
     // MARK: - URL resolution
 
-    /// Try preferred subfolder first (e.g., "Sounds"), then fall back to bundle root.
+    /// Try preferred subfolder first then fall back to bundle root.
     private func resolveURL(for name: String, ext: String) -> URL? {
         if let u = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: preferredSubdirectory) {
             return u
@@ -161,7 +160,7 @@ final class SoundManager: NSObject {
     
     private func ensureAudioSessionActive() {
         let session = AVAudioSession.sharedInstance()
-        // .ambient won’t pause other audio; use .playback if you want “app takes over”
+        // .ambient won’t pause other audio; use .playback for “app takes over”
         try? session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
         try? session.setActive(true, options: [])
     }
@@ -189,7 +188,7 @@ extension SoundManager {
 
 
     /// Start (or swap) a looping track with a gentle fade-in.
-    /// Looks for .wav first (your default), then .mp3.
+    /// Looks for .wav first, then .mp3.
     func startLoop(named name: String, volume: Float = 0.8, fadeIn: TimeInterval = 0.8) {
         // If same track already playing, just fade to target volume
         if Self.bgmCurrentName == name, let p = Self.bgmPlayer, p.isPlaying {
@@ -205,11 +204,11 @@ extension SoundManager {
               ?? resolveURL(for: name, ext: "mp3")
 
         guard let url else {
-            print("⚠️ Loop asset '\(name)' not found (.wav or .mp3)")
+            print("Loop asset '\(name)' not found (.wav or .mp3)")
             return
         }
 
-        // Make sure the session is active (mixes with others by default in your setup)
+        // Make sure the session is active
         ensureAudioSessionActive()
 
         do {
@@ -224,7 +223,7 @@ extension SoundManager {
             Self.bgmTargetVolume = volume
             fade(to: isMusicMuted ? 0.0 : volume, over: fadeIn)
         } catch {
-            print("⚠️ Failed to start loop '\(name)': \(error)")
+            print("Failed to start loop '\(name)': \(error)")
         }
     }
 

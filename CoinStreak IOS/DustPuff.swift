@@ -54,7 +54,6 @@ private struct DustPuffCanvas: View, Animatable {
 
     var body: some View {
         Canvas { context, _ in
-            // ----- BEGIN: tight, ground-hugging puff (visibility-first) -----
 
             // Use the animated progress directly
             let tt: CGFloat = max(0, min(1, progress))
@@ -72,7 +71,7 @@ private struct DustPuffCanvas: View, Animatable {
             // Keep it hugging the ground
             let squash: CGFloat = 0.55
 
-            // Blob size (pretty big so you can’t miss it)
+            // Blob size
             let baseW: CGFloat = 34
             let baseH: CGFloat = 22
             let scale: CGFloat = 1.0 + 0.15 * grow
@@ -81,7 +80,7 @@ private struct DustPuffCanvas: View, Animatable {
 
             
             #if DEBUG
-            // DEBUG: center marker so we know we're drawing at the right spot
+            // DEBUG: center marker to see origin
             context.fill(
                 Path(ellipseIn: CGRect(x: originX - 3, y: groundY - 2, width: 6, height: 4)),
                 with: .color(.green)
@@ -116,7 +115,7 @@ private struct DustPuffCanvas: View, Animatable {
     
 
 
-                // Main blob (make it bright for testing)
+                // Main blob
                 context.fill(Path(ellipseIn: rect), with: .color(baseColor.opacity(0.95 * fade)))
 
                 // Soft shadow just beneath
@@ -127,8 +126,7 @@ private struct DustPuffCanvas: View, Animatable {
 
 
         }
-        // Keep modifiers very short (big chains can trigger the error)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .blur(radius: 3) // soft but simple
+        .blur(radius: 3) // soft
     }
 }

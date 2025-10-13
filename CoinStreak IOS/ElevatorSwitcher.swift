@@ -124,7 +124,7 @@ struct ElevatorSwitcher<Below: View, Mid: View, Above: View>: View {
                 }
                 .zIndex(10)
                 
-                // NEW: mid overlay lives above doors, below the top UI
+                // mid overlay lives above doors, below the top UI
                 midOverlay()
                   .frame(maxWidth: .infinity, maxHeight: .infinity)
                   .contentShape(Rectangle())
@@ -144,7 +144,7 @@ struct ElevatorSwitcher<Below: View, Mid: View, Above: View>: View {
                 doorsOpen = (currentBackwallName != starterSceneName)
                 doorsHidden = doorsOpen
 
-                // If we mount on Starter (doors closed), streak should be ABOVE doors.
+                // If mount on Starter (doors closed), streak should be ABOVE doors.
                 if currentBackwallName == starterSceneName {
                     showAbove = true
                     showBelow = false

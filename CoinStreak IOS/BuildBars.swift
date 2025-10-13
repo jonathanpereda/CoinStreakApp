@@ -8,7 +8,7 @@ import Foundation
 
 /// Tuning for end-of-streak-only rewards.
 struct ProgressTuning {
-    // Coin success probability (chosen face). For a fair coin use 0.5.
+    // Coin success probability (chosen face).
     let p: Double
     // Reward curve parameters: r(s) = s^γ * c^(s-1), with c < 1/p to keep sums finite.
     let c: Double
@@ -22,7 +22,7 @@ struct ProgressTuning {
     }
 
     /// E[r(L)] where L ~ Geometric(q) on {1,2,...} with P(L=ℓ) = q * p^(ℓ-1).
-    /// We sum until terms are negligible; c must be < 1/p or this diverges.
+    /// sum until terms are negligible; c must be < 1/p or this diverges.
     func expected_r_of_L(tol: Double = 1e-12, maxL: Int = 10_000) -> Double {
         precondition(c < 1.0 / p, "Reward grows too fast: require c < 1/p")
         var acc = 0.0
@@ -47,7 +47,7 @@ struct ProgressTuning {
     }
 }
 
-/// Define your tier intents in "target flips", then generate fixed bar totals at launch.
+/// Define tier intents in "target flips", then generate fixed bar totals at launch.
 struct ProgressTierSpec {
     let name: String
     let targetFlips: Double
@@ -66,10 +66,11 @@ func buildTiers(tuning: ProgressTuning, specs: [ProgressTierSpec]) -> [ProgressT
     }
 }
 
-// --- Example wiring (fair coin; same curve we discussed) ---
+// --- Example wiring ---
 let tuning = ProgressTuning(p: 0.5, c: 1.7, gamma: 0.7)
 
-// Author these numbers by feel; the math converts them to actual bar totals:
+/*
+
 let tierSpecs: [ProgressTierSpec] = [
     .init(name: "Bronze",   targetFlips: 100),
     .init(name: "Silver",   targetFlips: 140),
@@ -82,3 +83,4 @@ let tierSpecs: [ProgressTierSpec] = [
 let tiers = buildTiers(tuning: tuning, specs: tierSpecs)
 // -> use `tiers[i].barTotal` in your UI/logic; display names from `tiers[i].name`
 
+*/

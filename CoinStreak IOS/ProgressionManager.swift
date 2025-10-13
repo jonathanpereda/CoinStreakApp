@@ -19,13 +19,17 @@ final class ProgressionManager: ObservableObject {
         let incrementPerLevel: Int // e.g. 20 (so L0=30, L1=50, L2=70, ...)
     }
 
-    let tuning: ProgressTuning                    // your r(s) function
+    let tuning: ProgressTuning
     let starterName: String = "Starter"
+    #if TRAILER_RESET
+    let nonStarterNames: [String] = ["Pond", "Space", "Brick", "Chair_Room", "Lab", "Backrooms", "Underwater"]
+    #else
     let nonStarterNames: [String] = ["Lab", "Pond", "Brick", "Chair_Room", "Space", "Backrooms", "Underwater"] // fixed, ordered (not random)
+    #endif
     let linear: LinearConfig
 
     // MARK: - Derived (compat layer to minimize UI changes)
-    var tierIndex: Int { levelIndex } // Back-compat: you were observing this
+    var tierIndex: Int { levelIndex } // Back-compat
     var currentTierName: String {
         if levelIndex % 2 == 0 { return starterName }
         let i = (levelIndex / 2) % max(nonStarterNames.count, 1)
@@ -38,14 +42,11 @@ final class ProgressionManager: ObservableObject {
         min(1.0, currentProgress / Double(currentBarTotal))
     }
 
-    // MARK: - Init
     static func standard() -> ProgressionManager {
-        // Keep your award curve
         let tuning = ProgressTuning(p: 0.5, c: 1.7, gamma: 0.7)
 
-        // Tweak these two numbers to taste.
-        // Example: start at 30 flips, +20 per level → 30,50,70,90,110,...
-        let linear = LinearConfig(baseTargetFlips: 40, incrementPerLevel: 10)         //TUNE PROGRESSION
+        // MARK: TUNE PROGRESSION
+        let linear = LinearConfig(baseTargetFlips: 40, incrementPerLevel: 10)
 
         return ProgressionManager(tuning: tuning, linear: linear)
     }
@@ -92,7 +93,7 @@ final class ProgressionManager: ObservableObject {
         currentProgress = 0.0
     }
 
-    // MARK: - Persistence keys (v2)
+    // MARK: - Persistence keys
     private static let kLevelIndex   = "pm_levelIndex_v2"
     private static let kCurProgress  = "pm_curProgress_v2"
 }

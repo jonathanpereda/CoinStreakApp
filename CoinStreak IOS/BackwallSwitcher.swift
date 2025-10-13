@@ -8,7 +8,7 @@ struct BackwallSwitcher<Middle: View>: View {
     var onDropImpact: ((Date) -> Void)? = nil
     @ViewBuilder var middle: () -> Middle
 
-    // === Tuning (your existing values) ===
+    // === Tuning ===
     private let perspective: CGFloat = 0.55
     private let totalDur: Double = 2.2
     private let swingFrac: Double   = 0.55
@@ -22,7 +22,7 @@ struct BackwallSwitcher<Middle: View>: View {
     private let fadeTail: Double       = 0.14
     private let dropOvershoot: CGFloat = 200
 
-    // === State (same as before) ===
+    // === State ===
     @State private var currentImage: String
     @State private var outgoingImage: String?
     @State private var animStart: Date? = nil
@@ -42,7 +42,7 @@ struct BackwallSwitcher<Middle: View>: View {
         _currentImage = State(initialValue: backwallName)
     }
 
-    // Convenience init for when you don't want to pass a middle layer
+    // Convenience init for when I don't want to pass a middle layer
     init(backwallName: String, onDropImpact: ((Date) -> Void)? = nil) where Middle == EmptyView {
         self.init(backwallName: backwallName, onDropImpact: onDropImpact) { EmptyView() }
     }
@@ -60,7 +60,7 @@ struct BackwallSwitcher<Middle: View>: View {
                     .clipped()
                     .ignoresSafeArea()
 
-                // 2) MIDDLE SLOT — your content goes here (e.g., StreakCounter)
+                // 2) MIDDLE SLOT — content goes here
                 middle()
 
                 // 3) OUTGOING wall (front), animated
@@ -142,7 +142,7 @@ struct BackwallSwitcher<Middle: View>: View {
     }
 }
 
-// === Helpers (unchanged) ===
+// === Helpers ===
 private func segProgress(_ t: Double, _ a: Double, _ b: Double) -> Double {
     guard b > a else { return t >= b ? 1 : 0 }
     return min(1, max(0, (t - a) / (b - a)))

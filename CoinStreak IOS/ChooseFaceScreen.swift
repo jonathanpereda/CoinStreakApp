@@ -1,6 +1,6 @@
 import SwiftUI
 
-// === Sprite helpers (localized to the chooser) ===
+// === Sprite helpers ===
 
 private enum CoinSide: String { case H = "Heads", T = "Tails" }
 
@@ -12,12 +12,12 @@ private struct SpriteFlipPlan: Equatable {
     let duration:  Double
 }
 
-// Your chooser uses the same “large alpha box” correction as gameplay.
-// If you change the main tweak later, mirror the numbers here.
+// chooser uses the same “large alpha box” correction as gameplay.
+// ************If you change the main tweak later, mirror the numbers here.***************
 private struct CoinVisualTweak { let scale: CGFloat; let nudgeY: CGFloat }
 private let ChooseCoinTweak = CoinVisualTweak(scale: 2.7, nudgeY: -48)
 
-// Your atlas frame names are coin_HT_0001...0036 and coin_TH_0001...0036
+// atlas frame names are coin_HT_0001...0036 and coin_TH_0001...0036
 private func atlasFrameName(prefix: String, idx1based: Int) -> String {
     String(format: "%@_%04d", prefix, idx1based)
 }
@@ -58,7 +58,7 @@ private func spriteFrameFor(plan: SpriteFlipPlan, now: Date) -> String {
     return atlasFrameName(prefix: finalPrefix, idx1based: 36)
 }
 
-// Minimal sprite image view mirroring your gameplay component
+// Minimal sprite image view mirroring gameplay component
 private struct MiniSpriteCoinImage: View {
     let plan: SpriteFlipPlan?
     let idleFace: CoinSide
@@ -90,14 +90,14 @@ struct ChooseFaceScreen: View {
     let screenSize: CGSize
     let onSelection: (Face) -> Void   // selection callback to ContentView
 
-    // Match your main game’s layout constants so placement feels consistent
+    // Match main game’s layout constants so placement feels consistent
     private let coinDiameterPctMain: CGFloat = 0.565
     private let coinRestOverlapPct: CGFloat = 0.06
 
     // Smaller chooser coins
-    private let coinDiameterPctChoose: CGFloat = 0.36  // tweak to taste
+    private let coinDiameterPctChoose: CGFloat = 0.36
 
-    // 🔧 Easy tuning for this screen
+    // tuning for screen
     private let chooseSpacingMultiplier: CGFloat = 0    // horizontal gap = coinD * this
     private let shadowYOffsetTweakChoose: CGFloat = -10   // per-screen nudge (pts)
     private let coinsXOffset: CGFloat = 0               // move both coins left/right
@@ -168,7 +168,7 @@ struct ChooseFaceScreen: View {
     }
 
     private func choose(_ selected: Face) {
-        // You already animate the coins out inside PickableCoin and call this after.
+        // already animate the coins out inside PickableCoin and call this after.
         withAnimation(.easeInOut(duration: 0.35)) {
             onSelection(selected)
         }
@@ -242,7 +242,7 @@ private struct PickableCoin: View {
             guard !isAnimating else { return }
             isAnimating = true
 
-            // 🔊 Play launch sound immediately on pick
+            // Play launch sound immediately on pick
             if let s = ["launch_1","launch_2"].randomElement() {
                 SoundManager.shared.play(s)
             }
