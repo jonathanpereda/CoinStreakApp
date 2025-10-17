@@ -12,6 +12,11 @@ import CoreText
 struct CoinStreak_IOSApp: App {
     init() {
         registerAllBundleFonts()
+        _ = InstallIdentity.getOrCreateInstallId()
+        // No auto-retire on fresh install anymore.
+        if InstallMarker.isFreshInstall() {
+            InstallMarker.markInstalled()
+        }
     }
     var body: some Scene {
         WindowGroup {
