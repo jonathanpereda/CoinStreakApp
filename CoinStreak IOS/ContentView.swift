@@ -1420,11 +1420,84 @@ struct ContentView: View {
                     iconPulse = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { iconPulse = false }
                 } else {
-                    // (keep your existing award/fill/advance logic)
-                    // -- no edits here --
-                    // Play landing sound at the end like before
-                    if preStreak > 0, preStreak >= 5 { SoundManager.shared.play("boost_1") }
-                    // ... (your award/pulse, barValueOverride, tier advance code remains exactly as you have it) ...
+                    // END-OF-STREAK: award once if there was a run going
+                    if preStreak > 0 {
+
+                        if preStreak >= 5 {
+                            SoundManager.shared.play("boost_1")
+                        }
+
+                        // Current snapshot for the pulse
+                        let preProgress = progression.currentProgress
+                        let total = Double(progression.currentBarTotal)
+                        let needed = max(0.0, total - preProgress)
+                        let rawAward = progression.tuning.r(preStreak)
+                        let applied  = min(needed, rawAward)
+
+                        // Emit the colored wedge pulse for the UI
+                        barPulse = AwardPulse(
+                            id: UUID(),
+                            start: preProgress,
+                            delta: applied,
+                            end: preProgress + applied,
+                            color: streakColor(preStreak),
+                            tierIndex: progression.tierIndex
+                        )
+
+                        // Apply the award to the model WITHOUT spillover or immediate tier advance
+                        let didFill = progression.applyAward(len: preStreak)
+
+                        // If this award FILLS the bar, advance tier AFTER the fill animation plays
+                        if didFill {
+                            isTierTransitioning = true
+
+                            // Keep this delay in sync with TierProgressBar’s grow+fade timings (≈0.28 + 0.22)
+                            let fillAnimationDelay: Double = 0.55
+                            // complete_1 sound delay
+                            let postCompletePause: Double = 0.25
+
+                            SoundManager.shared.stopLoop(fadeOut: 0.6)
+
+                            withAnimation(.easeOut(duration: fillAnimationDelay * 0.9)) {
+                                counterOpacity = 0.0
+                            }
+
+                            // When the fill animation finishes, play the completion sting
+                            DispatchQueue.main.asyncAfter(deadline: .now() + fillAnimationDelay) {
+                                SoundManager.shared.play("complete_1")
+
+
+                                // During the sting, smoothly slide the bar back to 0 — single animation (no keyframes)
+                                let oldTotal = Double(progression.currentBarTotal)
+                                let downAnimDur: Double = 0.45
+
+                                // 1) Set starting point with NO animation so we don’t trigger onChange spam
+                                withTransaction(Transaction(animation: nil)) {
+                                    barValueOverride = oldTotal
+                                }
+
+                                // 2) Animate straight to zero in one go
+                                withAnimation(.linear(duration: downAnimDur)) {
+                                    barValueOverride = 0
+                                }
+
+                                // After the pause, reset override and advance tier (switch backwall)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + postCompletePause) {
+                                    let tx = Transaction(animation: nil)
+                                    withTransaction(tx) {
+                                        barValueOverride = nil
+                                    }
+                                    // Tell the close callback to fade the counter back in on top when done.
+                                    deferCounterFadeInUntilClose = true
+
+                                    progression.advanceTierAfterFill() // triggers ElevatorSwitcher to CLOSE to Starter
+                                    isTierTransitioning = false
+                                }
+                            }
+                        }
+                    }
+
+                    // Play landing sound
                     SoundManager.shared.play(["land_1","land_2"].randomElement()!)
                 }
             }
