@@ -212,7 +212,7 @@ private func flightParams(
     impulse: Double?,
     needOdd: Bool,
     screenH: CGFloat
-) -> (halfTurns: Int, total: Double, jump: CGFloat) {
+) -> (halfTurns: Int, total: Double, jump: CGFloat, isSuper: Bool) {
 
     // Defaults = your old random-tap behavior
     var baseHalfTurnsRangeEven = [6, 8, 10]
@@ -220,21 +220,20 @@ private func flightParams(
     var total = 0.85
     let defaultJump = max(180, UIScreen.main.bounds.height * 0.32)
 
-    // No swipe → original feel
+    // No swipe → original feel (and not "super")
     guard let rawPower = impulse else {
         let halfTurns = (needOdd ? baseHalfTurnsRangeOdd : baseHalfTurnsRangeEven).randomElement()!
-        return (halfTurns, total, CGFloat(defaultJump))
+        return (halfTurns, total, CGFloat(defaultJump), false)
     }
 
     // --- Power shaping ---
-    // We *do not* clamp yet; we detect "super" using the raw value.
+    // Use *raw* (unclamped) power to detect "super"; clamp for normal feel.
     let norm = max(0.0, rawPower) / 1.6        // 1.0 ≈ old "max"
-    let isSuper = norm > 2                   // threshold for breaking the ceiling
-    let superT  = clamp((norm - 1.05) / 0.45, 0.0, 1.0) // smooth 0..1 ramp up to ~1.50× old
+    let isSuper = norm > 2                   // threshold to break ceiling (tune as you like)
+    let superT  = clamp((norm - 1.05) / 0.45, 0.0, 1.0) // ramp 0→1 up to ~1.50× old
 
-    // For the regular mapping we still use a clamped value (keeps normal feel)
     let pClamped = clamp(rawPower, 0.0, 1.6)
-    let shaped = pow(pClamped / 1.6, 0.85)
+    let shaped = pow(pClamped / 1.6, 0.85)     // raise exponent for less sensitivity
 
     // --- Duration (normal lane) ---
     total = 0.58 + (1.05 - 0.58) * shaped
@@ -249,28 +248,22 @@ private func flightParams(
 
     // --- Super swipe lane: break the ceiling gracefully ---
     if isSuper {
-        // Target jump close to top: ~86% of screen height upward from baseline
         let superJumpTarget = screenH * 0.86
-
-        // Blend normal jump → super jump as superT goes 0→1
         jump = CGFloat(Double(jump) * (1.0 - superT) + Double(superJumpTarget) * superT)
-
-        // Give a little extra airtime + spins on super swipes
-        total += 0.10 * Double(superT)              // up to +0.10s
-        maxTurns += 2                               // allow a bit more headroom
+        total += 0.10 * Double(superT)         // extra airtime
+        maxTurns += 2                          // a bit more spin headroom
         halfTurns = Int(round(Double(halfTurns) + 2.0 * Double(superT)))
     }
 
-    // Parity fix to ensure we land on the desired face
+    // Parity fix
     if (halfTurns % 2 == 1) != needOdd {
         halfTurns += (halfTurns <= maxTurns ? 1 : -1)
     }
-
-    // Final guardrails
     halfTurns = clamp(halfTurns, minTurns, maxTurns)
 
-    return (halfTurns, total, jump)
+    return (halfTurns, total, jump, isSuper)
 }
+
 
 
 
@@ -573,6 +566,7 @@ struct ContentView: View {
     @State private var settleT: Double = 1.0   // 1 = idle (no wobble), animate 0 -> 1 on land
     @State private var bounceGen: Int = 0   // cancels any in-flight bounce sequence
     @State private var settleBounceT: Double = 1.0   // 0→1 drives bounce curve; 1 = idle
+    @State private var currentFlipWasSuper = false
 
     // App phase
     @State private var phase: AppPhase = .choosing
@@ -1296,6 +1290,22 @@ struct ContentView: View {
             t += dnResp * 0.95
         }
     }
+    
+    // Plays the hero-drop thud and spawns the gameplay dust burst at the coin’s ground contact.
+    private func triggerDustImpactFromLanding() {
+        let now = Date()
+        gameplayDustTrigger = now
+        SoundManager.shared.play("thud_1")
+
+        // auto-remove after the puff (match DustPuff’s 0.48s + tiny buffer)
+        let lifetime = 0.48 + 0.05
+        DispatchQueue.main.asyncAfter(deadline: .now() + lifetime) {
+            if gameplayDustTrigger == now {
+                gameplayDustTrigger = nil
+            }
+        }
+    }
+    
 
     // MARK: - FLIP LOGIC
     
@@ -1338,6 +1348,7 @@ struct ContentView: View {
         let halfTurns = params.halfTurns
         let total = params.total
         let jump = params.jump
+        currentFlipWasSuper = params.isSuper
 
         // Sprite plan
         let startSide: CoinSide = (baseFaceAtLaunch == "Heads") ? .H : .T
@@ -1383,6 +1394,12 @@ struct ContentView: View {
             withAnimation(.linear(duration: 0.70)) { settleBounceT = 1.0 }
             settleT = 0.0
             withAnimation(.linear(duration: 0.85)) { settleT = 1.0 }
+            
+            // If this was a “super” swipe, also do the dust burst + thud like hero drop
+            if currentFlipWasSuper {
+                triggerDustImpactFromLanding()
+                currentFlipWasSuper = false
+            }
 
             // (unchanged) streak / award / tier / SFX logic
             if let faceVal = Face(rawValue: desired) {
