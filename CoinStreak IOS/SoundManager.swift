@@ -50,6 +50,9 @@ final class SoundManager: NSObject {
     /// Play a short one-shot SFX
     func play(_ name: String, volume: Float = 1.0) {
         guard !isSfxMuted else { return }
+        
+        ensureAudioSessionActive()
+        
         let url = resolveURL(for: name, ext: "wav")
               ?? resolveURL(for: name, ext: "mp3")
         guard let url else {
@@ -161,7 +164,7 @@ final class SoundManager: NSObject {
     private func ensureAudioSessionActive() {
         let session = AVAudioSession.sharedInstance()
         // .ambient won’t pause other audio; use .playback for “app takes over”
-        try? session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+        try? session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
         try? session.setActive(true, options: [])
     }
 

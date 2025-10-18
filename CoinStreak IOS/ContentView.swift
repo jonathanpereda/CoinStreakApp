@@ -725,6 +725,7 @@ struct ContentView: View {
     @State private var fontBelowName: String = "Herculanum"   // default matches Starter
     @State private var fontAboveName: String = "Herculanum"
     @State private var lastTierName: String = "Starter"
+    @State private var barNonce = 0
     
     //MuteSounds
     @State private var showAudioMenu = false
@@ -868,7 +869,7 @@ struct ContentView: View {
                             }
                         }
                         .frame(width: barWidth, height: barHeight)
-                        .id("tier-\(progression.tierIndex)")
+                        .id("tier-\(progression.tierIndex)-\(barNonce)")
                         .compositingGroup()
                         .rotation3DEffect(.degrees(tiltXDeg),
                                           axis: (x: 1, y: 0, z: 0),
@@ -1867,7 +1868,10 @@ struct ContentView: View {
                             // complete_1 sound delay
                             let postCompletePause: Double = 0.25
 
-                            SoundManager.shared.stopLoop(fadeOut: 0.6)
+                            if !progression.mapLocked {
+                                SoundManager.shared.stopLoop(fadeOut: 0.6)
+                            }
+                            //SoundManager.shared.stopLoop(fadeOut: 0.6)
 
                             withAnimation(.easeOut(duration: fillAnimationDelay * 0.9)) {
                                 counterOpacity = 0.0
@@ -1908,7 +1912,11 @@ struct ContentView: View {
                                     }
 
                                     if progression.mapLocked {
-                                        // (We already reset the model, so no jitter now)
+                                        // (Model is already 0 from earlier.)
+                                        // Force the bar view to rebuild so it reflects 0 immediately.
+                                        withTransaction(Transaction(animation: nil)) {
+                                            barNonce &+= 1
+                                        }
                                         withAnimation(.easeInOut(duration: 0.25)) {
                                             counterOpacity = 1.0
                                         }

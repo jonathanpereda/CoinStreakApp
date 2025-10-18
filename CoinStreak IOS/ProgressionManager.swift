@@ -65,7 +65,7 @@ final class ProgressionManager: ObservableObject {
         let tuning = ProgressTuning(p: 0.5, c: 1.7, gamma: 0.7)
 
         // MARK: TUNE PROGRESSION
-        let linear = LinearConfig(baseTargetFlips: 3, incrementPerLevel: 0) //40 : 10
+        let linear = LinearConfig(baseTargetFlips: 40, incrementPerLevel: 10) //40 : 10
 
         return ProgressionManager(tuning: tuning, linear: linear)
     }
