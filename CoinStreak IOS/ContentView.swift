@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Foundation
+import UIKit
 
 // MARK: - MISC
 
@@ -40,6 +41,129 @@ private func panelWidth() -> CGFloat {
 private func tabWidth() -> CGFloat {
     let scale = UIScreen.main.scale
     return 89.0 / scale // TAB_W_PX / scale
+}
+
+
+// MARK: - MAP MENU
+
+private struct MapItem: Identifiable, Equatable {
+    let id: Int        // 0 = Starter, 1... = non-starters in order
+    let name: String
+    let thumbName: String?   // optional asset name for a thumbnail (plug later)
+}
+
+private func makeMapItems(_ progression: ProgressionManager) -> [MapItem] {
+    // Order: Starter, then nonStarters in the order you already defined
+    var items: [MapItem] = []
+    items.append(MapItem(id: 0, name: progression.starterName, thumbName: nil))
+    for (i, n) in progression.nonStarterNames.enumerated() {
+        // If you have actual thumbnail assets, set thumbName like "thumb_\(n)"
+        items.append(MapItem(id: i + 1, name: n, thumbName: nil))
+    }
+    return items
+}
+
+/// Current map index for the carousel list (0 = Starter)
+private func currentMapListIndex(_ progression: ProgressionManager) -> Int {
+    if progression.levelIndex % 2 == 0 { return 0 }
+    let i = (progression.levelIndex / 2) % max(progression.nonStarterNames.count, 1)
+    return i + 1
+}
+
+private struct MapTile: View {
+    enum State { case locked, unlocked(isCurrent: Bool) }
+    let state: State
+    let backwallName: String?  // <- now expects a backwall asset name
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            // Base tile
+            RoundedRectangle(cornerRadius: 14)
+                .fill(.white.opacity(0.10))
+
+            switch state {
+            case .locked:
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.gray.opacity(0.25))
+                Image(systemName: "lock.fill")
+                    .font(.system(size: size * 0.28, weight: .bold))
+                    .foregroundColor(.white.opacity(0.9))
+
+            case .unlocked(let isCurrent):
+                ZStack {
+                    if let backwallName {
+                        BackwallThumb(
+                            imageName: backwallName,
+                            corner: 14,
+                            cropBottomPx: 1025,
+                            zoomOut: 1,
+                            panUpPx: 700
+                        )
+
+                    } else {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(.white.opacity(0.12))
+                            .overlay(Image(systemName: "photo").opacity(0.18))
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color.white.opacity(0.95), lineWidth: 2)
+                        .shadow(radius: 4)
+                        .opacity(isCurrent ? 1 : 0)
+                )
+
+
+            }
+        }
+        .frame(width: size, height: size)
+        .shadow(color: .black.opacity(0.35), radius: 5, x: 0, y: 3)
+    }
+}
+
+
+/// Shows a backwall image cropped by a fixed number of pixels from the bottom, inside a rounded tile.
+private struct BackwallThumb: View {
+    let imageName: String
+    let corner: CGFloat
+    let cropBottomPx: CGFloat
+    let zoomOut: CGFloat   // 1.0 = normal fit, <1 zooms OUT, >1 zooms IN
+    let panUpPx: CGFloat   // + moves view UP the original image (shows a higher section)
+
+    var body: some View {
+        GeometryReader { geo in
+            if let ui = UIImage(named: imageName) {
+                let pixelHeight = ui.size.height * ui.scale
+                let cropFrac = min(max(cropBottomPx / max(pixelHeight, 1), 0), 0.95)
+                let visibleFrac = max(1 - cropFrac, 0.05)
+
+                // Convert pan in pixels to a fraction of the original, clamp so we stay in-bounds.
+                let maxPanPx = pixelHeight * (1 - visibleFrac)
+                let clampedPanPx = min(max(panUpPx, 0), maxPanPx)
+                let panFrac = clampedPanPx / max(pixelHeight, 1)
+
+                ZStack(alignment: .top) {
+                    Image(uiImage: ui)
+                        .resizable()
+                        .scaledToFill()
+                        .scaleEffect(zoomOut, anchor: .top)
+                        // Shift the drawn image DOWN by the pan fraction (relative to the tall, internal height)
+                        // Positive panUpPx shows a *higher* section of the original.
+                        .offset(y: (panFrac * geo.size.height) / visibleFrac)
+                        .frame(width: geo.size.width, height: geo.size.height / visibleFrac)
+                        .clipped()
+                }
+                .frame(width: geo.size.width, height: geo.size.height)
+                .clipShape(RoundedRectangle(cornerRadius: corner))
+            } else {
+                RoundedRectangle(cornerRadius: corner)
+                    .fill(.white.opacity(0.12))
+                    .overlay(Image(systemName: "photo").opacity(0.18))
+            }
+        }
+    }
 }
 
 
@@ -215,8 +339,8 @@ private func flightParams(
 ) -> (halfTurns: Int, total: Double, jump: CGFloat, isSuper: Bool) {
 
     // Defaults = your old random-tap behavior
-    var baseHalfTurnsRangeEven = [6, 8, 10]
-    var baseHalfTurnsRangeOdd  = [7, 9, 11]
+    let baseHalfTurnsRangeEven = [6, 8, 10]
+    let baseHalfTurnsRangeOdd  = [7, 9, 11]
     var total = 0.85
     let defaultJump = max(180, UIScreen.main.bounds.height * 0.32)
 
@@ -540,12 +664,23 @@ private struct RecentFlipsColumn: View {
 
 struct ContentView: View {
     @StateObject private var store = FlipStore()
+    
+    // Score board stuff
     @State private var didRestorePhase = false
     @State private var didKickBootstrap = false
     @StateObject private var scoreboardVM = ScoreboardVM()
     @State private var scoreboardOpen = false
+    
+    // Map menu stuff
     @Environment(\.scenePhase) private var scenePhase
+    @State private var isMapSelectOpen = false
+    @State private var manualTargetAfterClose: Int? = nil
+    @State private var showNewMapToast = false
+    @State private var lastUnlockedCount = 1   // starter = 1
+    @State private var showCycleHint = false
+    @State private var cycleHintText = "Cycle: On"
 
+    
     @State private var curState = "Heads"
 
     // animation state
@@ -595,7 +730,6 @@ struct ContentView: View {
     @State private var showAudioMenu = false
     @State private var sfxMutedUI   = SoundManager.shared.isSfxMuted
     @State private var musicMutedUI = SoundManager.shared.isMusicMuted
-
 
 
     @ViewBuilder
@@ -679,6 +813,12 @@ struct ContentView: View {
                             withAnimation(.easeInOut(duration: 0.25)) { counterOpacity = 1.0 }
                             deferCounterFadeInUntilClose = false
                         }
+                        // If a manual nonstarter→nonstarter selection is waiting, jump to it now (this triggers OPEN)
+                        if let pending = manualTargetAfterClose {
+                            manualTargetAfterClose = nil
+                            progression.jumpToLevelIndex(pending)   
+                        }
+
                     }
                 )
                 
@@ -709,15 +849,24 @@ struct ContentView: View {
                         let barColor = LinearGradient(colors: [ Color("#908B7A"), Color("#C0BAA2") ],
                                                       startPoint: .leading, endPoint: .trailing)
 
-                        TierProgressBar(
-                            tierIndex: progression.tierIndex,
-                            total: progression.currentBarTotal,
-                            liveValue: barValueOverride ?? progression.currentProgress,
-                            pulse: barPulse,
-                            height: barHeight,
-                            corner: barHeight / 2,
-                            baseFill: barColor
-                        )
+                        ZStack {
+                            TierProgressBar(
+                                tierIndex: progression.tierIndex,
+                                total: progression.currentBarTotal,
+                                liveValue: barValueOverride ?? progression.currentProgress,
+                                pulse: barPulse,
+                                height: barHeight,
+                                corner: barHeight / 2,
+                                baseFill: barColor
+                            )
+                            if progression.mapLocked {
+                                Image(systemName: "pause.circle")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.95))
+                                    .shadow(radius: 2)
+                                    .allowsHitTesting(false)
+                            }
+                        }
                         .frame(width: barWidth, height: barHeight)
                         .id("tier-\(progression.tierIndex)")
                         .compositingGroup()
@@ -728,6 +877,9 @@ struct ContentView: View {
                         .onChange(of: progression.tierIndex) { _, _ in
                             barPulse = nil
                         }
+                        .opacity(isMapSelectOpen ? 0 : 1)
+                        .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+
 
                         Image(icon)
                             .resizable()
@@ -738,13 +890,68 @@ struct ContentView: View {
                             .shadow(color: iconPulse ? .yellow.opacity(0.5) : .clear,
                                     radius: iconPulse ? 3 : 0)
                             .animation(.easeOut(duration: 0.25), value: iconPulse)
+                            .opacity(isMapSelectOpen ? 0 : 1)
+                            .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                     }
                     .padding(.trailing, geo.safeAreaInsets.trailing + extraRight)
-                    .padding(.bottom, geo.safeAreaInsets.bottom + 18)
+                    .padding(.bottom, geo.safeAreaInsets.bottom + 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .allowsHitTesting(false)
                     .zIndex(50)                // keep above table/gameplay
                     .transition(.opacity)
+                    
+                    //OPEN MAP MENU BUTTON
+                    .overlay(alignment: .bottomLeading) {
+                        ZStack(alignment: .leading) {
+                            Button {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                    isMapSelectOpen.toggle()
+                                }
+                            } label: {
+                                Image(systemName: isMapSelectOpen ? "xmark" : "map.fill")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 22, height: 22)
+                                    .foregroundColor(.white.opacity(0.6))
+                                    .padding(7)
+                                    .background(.ultraThinMaterial.opacity(0.3))
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .shadow(radius: 3)
+                            }
+                            // Toast bubble – only when menu is CLOSED
+                            if !isMapSelectOpen && showNewMapToast {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.15, green: 0.55, blue: 1.0, opacity: 0.95),
+                                                Color(red: 0.50, green: 0.20, blue: 1.0, opacity: 0.95)
+                                            ],
+                                            startPoint: .leading, endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: 160, height: 24, alignment: .leading)
+                                    .overlay(
+                                        Text("New map unlocked")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 12),
+                                        alignment: .leading
+                                    )
+                                    // start exactly to the right of the 40pt map button
+                                    .padding(.leading, 40)
+                                    .offset(y: 0)
+                                    .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
+                                    .transition(.opacity)
+                                    .animation(.easeInOut(duration: 0.5), value: showNewMapToast)
+                            }
+
+
+                        }
+                        .padding(.leading, 24)
+                        .padding(.bottom, 25)
+                    }
+
                 }
 
 
@@ -842,6 +1049,152 @@ struct ContentView: View {
                     .transition(.opacity)
                     .allowsHitTesting(false)
                 }
+                
+                // MARK: - MAP MENU WINDOW
+                if isMapSelectOpen {
+                    VStack {
+                        Spacer()
+
+                        // Bottom floating content: left column + (empty) right side for carousel
+                        HStack(alignment: .center, spacing: 12) {
+                            // LEFT COLUMN: lock toggle (icon-only) + close button
+                            VStack(spacing: 12) {
+                                
+                                // Lock toggle icon (manual selects still allowed when ON)
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        progression.mapLocked.toggle()
+                                    }
+                                    cycleHintText = progression.mapLocked ? "Cycle: OFF" : "Cycle: ON"
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            showCycleHint = true
+                                        }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            showCycleHint = false
+                                        }
+                                    }
+
+                                } label: {
+                                    Image(systemName: progression.mapLocked
+                                          ? "pause.circle"
+                                          : "arrow.triangle.2.circlepath")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 22, height: 22)
+                                    .foregroundColor(.white)
+                                    .padding(7)
+                                    .background(.ultraThinMaterial.opacity(0.5))
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .shadow(radius: 3)
+                                }
+                                .overlay(alignment: .top) {
+                                    if showCycleHint {
+                                        Text(cycleHintText)
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(.white.opacity(0.75))
+                                            .padding(.vertical, 6)
+                                            .padding(.horizontal, 10)
+                                            .background(Color.black.opacity(0.15))
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                            .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 2)
+                                            .fixedSize(horizontal: true, vertical: true)   // ← let it expand past button width
+                                            .offset(y: -25)                                 // distance above
+                                            .allowsHitTesting(false)
+                                            .transition(.opacity)
+                                            .animation(.easeInOut(duration: 0.2), value: showCycleHint)
+                                            .zIndex(1)                                      // optional: draw on top
+                                    }
+                                }
+                                .onChange(of: isMapSelectOpen) { _, isOpen in
+                                    if !isOpen && showCycleHint {
+                                        showCycleHint = false
+                                    }
+                                }
+
+                            }
+                            .padding(.leading, 12)
+
+                            let items = makeMapItems(progression)
+                            let unlockedCount = progression.unlockedCount
+                            let currentIdx = currentMapListIndex(progression)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 10) {
+                                    ForEach(items) { item in
+                                        let idx = item.id
+                                        let isUnlocked = idx < unlockedCount
+                                        let isCurrent = (idx == currentIdx)
+
+                                        // Resolve the backwall asset name via tierTheme(for:)
+                                        let backwall: String? = {
+                                            // item.name is your tier name ("Starter", "Lab", etc.)
+                                            let theme = tierTheme(for: item.name)
+                                            return theme.backwall
+                                        }()
+
+                                        MapTile(
+                                            state: isUnlocked ? .unlocked(isCurrent: isCurrent) : .locked,
+                                            backwallName: backwall,
+                                            size: 90
+                                        )
+                                        .onTapGesture {
+                                            guard isUnlocked else { return }                // ignore locked tiles
+                                            let targetTile = idx
+                                            let currentTile = currentTileIndex()
+                                            if targetTile == currentTile {
+                                                // already here → just close the panel
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                                    isMapSelectOpen = false
+                                                }
+                                                return
+                                            }
+
+                                            let targetLI = levelIndexForTile(targetTile)
+                                            let onStarter = (currentTile == 0)
+
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                                isMapSelectOpen = false
+                                            }
+
+                                            if onStarter {
+                                                // Starter → Non-starter : OPEN only (switch directly to target map)
+                                                progression.jumpToLevelIndex(targetLI)
+                                            } else {
+                                                if targetTile == 0 {
+                                                    // Non-starter → Starter : CLOSE only (switch directly to Starter)
+                                                    progression.jumpToLevelIndex(0)
+                                                } else {
+                                                    // Non-starter → Non-starter : CLOSE, then OPEN (via Starter)
+                                                    manualTargetAfterClose = targetLI   // schedule the OPEN to target after close ends
+                                                    progression.jumpToLevelIndex(0)     // trigger the CLOSE by switching to Starter first
+                                                }
+                                            }
+                                        }
+
+                                    }
+                                    
+                                }
+                                .padding(.vertical, 4)
+                                .padding(.trailing, 8)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 96)
+                            .offset(y: 24)
+
+
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 10)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: min(180, UIScreen.main.bounds.height * 0.22)) // ~half the previous size
+                        // No background — floats over your map background
+                        // No dim layer — screen stays bright
+                    }
+                    .ignoresSafeArea(edges: .bottom)
+                }
+
+
 
 
 
@@ -888,6 +1241,13 @@ struct ContentView: View {
                                 withTransaction(Transaction(animation: nil)) {
                                     barPulse = nil
                                     progression.debugResetToFirstTier()
+                                    progression.debugResetUnlocks()   // ← add this
+
+                                    // local UI state cleanup you already added
+                                    resetMapSelectUI()
+
+                                    // make sure the toast diff doesn’t immediately fire after reset
+                                    lastUnlockedCount = 1  // starter-only
                                 }
 
                                 // Clear scoreboard UI immediately
@@ -1244,8 +1604,59 @@ struct ContentView: View {
             @unknown default: break
             }
         }
+        .onAppear {
+            lastUnlockedCount = progression.unlockedCount
+        }
+        .onChange(of: progression.unlockedCount) { old, new in
+            if new > old && !isMapSelectOpen {
+                triggerNewMapToast()
+            }
+            lastUnlockedCount = new
+        }
+
 
     }
+    
+    ////SOME MAP HELPERS
+    
+    /// Map tile index (0 = Starter, 1+ = non-starters) → canonical levelIndex
+    private func levelIndexForTile(_ idx: Int) -> Int {
+        return (idx == 0) ? 0 : (2 * (idx - 1) + 1)
+    }
+
+    /// Current tile index from progression.levelIndex (0 = Starter)
+    private func currentTileIndex() -> Int {
+        let li = progression.levelIndex
+        return (li % 2 == 0) ? 0 : (li + 1) / 2
+    }
+
+    private func triggerNewMapToast() {
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+            showNewMapToast = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                showNewMapToast = false
+            }
+        }
+    }
+    
+    // Clears all UI state related to the map selector/toast so a reset is truly fresh.
+    private func resetMapSelectUI() {
+        let noAnim = Transaction(animation: nil)
+        withTransaction(noAnim) {
+            // Map menu
+            isMapSelectOpen = false
+            progression.mapLocked = false
+            // Any manual jump target you’ve been using (if present)
+            manualTargetAfterClose = nil
+            
+            // Toast
+            showNewMapToast = false
+        }
+    }
+
+
     
     
     private func runReboundBounces() {
@@ -1464,35 +1875,51 @@ struct ContentView: View {
 
                             // When the fill animation finishes, play the completion sting
                             DispatchQueue.main.asyncAfter(deadline: .now() + fillAnimationDelay) {
+                                // 1) Completion sting (unchanged)
                                 SoundManager.shared.play("complete_1")
 
+                                // 2) Count this fill
+                                progression.registerBarFill()
 
-                                // During the sting, smoothly slide the bar back to 0 — single animation (no keyframes)
+                                // 3) Visual slide-down setup
                                 let oldTotal = Double(progression.currentBarTotal)
                                 let downAnimDur: Double = 0.45
 
-                                // 1) Set starting point with NO animation so we don’t trigger onChange spam
                                 withTransaction(Transaction(animation: nil)) {
                                     barValueOverride = oldTotal
                                 }
 
-                                // 2) Animate straight to zero in one go
+                                // --- Only for LOCKED mode, clear the model *now* to avoid jitter ---
+                                if progression.mapLocked {
+                                    // Clear the underlying progress immediately (no animation) so when the
+                                    // override is removed later, the model is already 0 and there’s no jump.
+                                    progression.resetBarAfterLockedFill()
+                                }
+
+                                // 4) Animate the visual bar back to 0 (unchanged)
                                 withAnimation(.linear(duration: downAnimDur)) {
                                     barValueOverride = 0
                                 }
 
-                                // After the pause, reset override and advance tier (switch backwall)
+                                // 5) After the pause, clear override and either restore counter or advance
                                 DispatchQueue.main.asyncAfter(deadline: .now() + postCompletePause) {
-                                    let tx = Transaction(animation: nil)
-                                    withTransaction(tx) {
+                                    withTransaction(Transaction(animation: nil)) {
                                         barValueOverride = nil
                                     }
-                                    // Tell the close callback to fade the counter back in on top when done.
-                                    deferCounterFadeInUntilClose = true
 
-                                    progression.advanceTierAfterFill() // triggers ElevatorSwitcher to CLOSE to Starter
-                                    isTierTransitioning = false
+                                    if progression.mapLocked {
+                                        // (We already reset the model, so no jitter now)
+                                        withAnimation(.easeInOut(duration: 0.25)) {
+                                            counterOpacity = 1.0
+                                        }
+                                        isTierTransitioning = false
+                                    } else {
+                                        deferCounterFadeInUntilClose = true
+                                        progression.advanceTierAfterFill()
+                                        isTierTransitioning = false
+                                    }
                                 }
+
                             }
                         }
                     }

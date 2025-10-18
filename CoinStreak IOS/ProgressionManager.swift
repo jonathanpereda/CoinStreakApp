@@ -12,6 +12,25 @@ final class ProgressionManager: ObservableObject {
     @Published private(set) var currentProgress: Double {         // fractional, no spillover
         didSet { UserDefaults.standard.set(currentProgress, forKey: Self.kCurProgress) }
     }
+    // Map lock (prevents automatic map changes; manual selects still allowed)
+    @Published var mapLocked: Bool {
+        didSet { UserDefaults.standard.set(mapLocked, forKey: Self.kMapLocked) }
+    }
+
+    // Total number of times the bar has filled (drives unlocks fairly)
+    @Published var totalFills: Int {
+        didSet { UserDefaults.standard.set(totalFills, forKey: Self.kTotalFills) }
+    }
+
+    // Unlock rule: starter always unlocked (1), then +1 map per every 2 fills.
+    var unlockedCount: Int {
+        let maxMaps = 1 + nonStarterNames.count
+        // Old:
+        // return min(1 + totalFills / 2, maxMaps)
+        // New (arrival-based unlocks):
+        return min(1 + ( (totalFills + 1) / 2 ), maxMaps)
+    }
+
 
     // MARK: - Config
     struct LinearConfig {
@@ -46,7 +65,7 @@ final class ProgressionManager: ObservableObject {
         let tuning = ProgressTuning(p: 0.5, c: 1.7, gamma: 0.7)
 
         // MARK: TUNE PROGRESSION
-        let linear = LinearConfig(baseTargetFlips: 40, incrementPerLevel: 10)
+        let linear = LinearConfig(baseTargetFlips: 3, incrementPerLevel: 0) //40 : 10
 
         return ProgressionManager(tuning: tuning, linear: linear)
     }
@@ -58,6 +77,8 @@ final class ProgressionManager: ObservableObject {
         let savedProg  = UserDefaults.standard.object(forKey: Self.kCurProgress) as? Double ?? 0.0
         self.levelIndex = max(0, savedLevel)
         self.currentProgress = max(0.0, savedProg)
+        self.mapLocked  = UserDefaults.standard.object(forKey: Self.kMapLocked) as? Bool ?? false
+        self.totalFills = UserDefaults.standard.integer(forKey: Self.kTotalFills)
     }
 
     // MARK: - Award logic (end-of-streak only)
@@ -83,6 +104,12 @@ final class ProgressionManager: ObservableObject {
         currentProgress = 0.0
         levelIndex &+= 1 // infinite
     }
+    
+    // Clears the progress bar after a fill when we are NOT auto-advancing maps.
+    func resetBarAfterLockedFill() {
+        // Just clear progress; do not touch levelIndex or totals.
+        currentProgress = 0
+    }
 
     // Debug: reset to first level with empty progress
     func debugResetToFirstTier() {
@@ -92,8 +119,29 @@ final class ProgressionManager: ObservableObject {
         levelIndex = 0
         currentProgress = 0.0
     }
+    // Resets the map-unlock progression and lock state.
+    func debugResetUnlocks() {
+        totalFills = 0          // starter-only unlocked (unlockedCount becomes 1)
+        mapLocked  = false
+    }
+    
+    func registerBarFill() {
+        totalFills &+= 1
+    }
+    
+    func jumpToLevelIndex(_ idx: Int) {
+        let clamped = max(0, idx)
+        if clamped != levelIndex {
+            levelIndex = clamped
+            // keep currentProgress unchanged (manual selection shouldn’t alter the bar)
+        }
+    }
+
 
     // MARK: - Persistence keys
     private static let kLevelIndex   = "pm_levelIndex_v2"
     private static let kCurProgress  = "pm_curProgress_v2"
+    private static let kMapLocked   = "pm_mapLocked_v1"
+    private static let kTotalFills  = "pm_totalFills_v1"
+
 }
