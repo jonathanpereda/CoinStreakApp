@@ -21,6 +21,13 @@ final class ProgressionManager: ObservableObject {
     @Published var totalFills: Int {
         didSet { UserDefaults.standard.set(totalFills, forKey: Self.kTotalFills) }
     }
+    
+    private let kDidMigrateUnlocks_v101 = "didMigrateUnlocks_v101"
+    private let kHighestTileVisited     = "highestTileVisited_v1" // 0 = Starter
+
+    @Published var highestTileVisited: Int {
+        didSet { UserDefaults.standard.set(highestTileVisited, forKey: kHighestTileVisited) }
+    }
 
     // Unlock rule: starter always unlocked (1), then +1 map per every 2 fills.
     var unlockedCount: Int {
@@ -55,7 +62,10 @@ final class ProgressionManager: ObservableObject {
         return nonStarterNames[i]
     }
     var currentBarTotal: Int {
-        max(1, linear.baseTargetFlips + levelIndex * linear.incrementPerLevel)
+        //max(1, linear.baseTargetFlips + levelIndex * linear.incrementPerLevel)
+        // grows every time the bar completes, independent of which map you’re on
+        max(1, linear.baseTargetFlips + totalFills * linear.incrementPerLevel)
+        
     }
     var progressFraction: Double {
         min(1.0, currentProgress / Double(currentBarTotal))
@@ -79,6 +89,32 @@ final class ProgressionManager: ObservableObject {
         self.currentProgress = max(0.0, savedProg)
         self.mapLocked  = UserDefaults.standard.object(forKey: Self.kMapLocked) as? Bool ?? false
         self.totalFills = UserDefaults.standard.integer(forKey: Self.kTotalFills)
+        self.highestTileVisited = UserDefaults.standard.object(forKey: kHighestTileVisited) as? Int ?? 0
+
+        let didMigrate = UserDefaults.standard.bool(forKey: kDidMigrateUnlocks_v101)
+        if !didMigrate {
+            // Derive current tile index from your existing levelIndex:
+            // 0 = Starter, 1 = first non-starter (Lab), etc.
+            let currentTile: Int
+            if levelIndex % 2 == 0 { currentTile = 0 } else { currentTile = (levelIndex + 1) / 2 }
+
+            // Seed highestTileVisited with at least the current tile.
+            if currentTile > highestTileVisited {
+                highestTileVisited = currentTile
+            }
+
+            // We want unlockedCount (1 + ceil(totalFills/2)) to be at least highestTileVisited+1.
+            // Minimal totalFills that guarantees that is: totalFills >= 2*D - 3, where D = highestTileVisited+1.
+            let maxMaps = 1 + nonStarterNames.count
+            let desiredUnlocked = min(highestTileVisited + 1, maxMaps)   // ← cap to real map count
+            let minTotalFills = max(0, 2 * desiredUnlocked - 3)
+
+            if totalFills < minTotalFills {
+                totalFills = minTotalFills
+            }
+
+            UserDefaults.standard.set(true, forKey: kDidMigrateUnlocks_v101)
+        }
     }
 
     // MARK: - Award logic (end-of-streak only)
@@ -99,10 +135,9 @@ final class ProgressionManager: ObservableObject {
 
     /// Call AFTER the fill animation completes to advance/reset (still no spillover).
     func advanceTierAfterFill() {
-        // Only act if we’re actually full
-        guard currentProgress >= Double(currentBarTotal) else { return }
+        // Called only after a confirmed fill; do not re-check against currentBarTotal
         currentProgress = 0.0
-        levelIndex &+= 1 // infinite
+        levelIndex &+= 1
     }
     
     // Clears the progress bar after a fill when we are NOT auto-advancing maps.
@@ -134,6 +169,11 @@ final class ProgressionManager: ObservableObject {
         if clamped != levelIndex {
             levelIndex = clamped
             // keep currentProgress unchanged (manual selection shouldn’t alter the bar)
+            let tile = (clamped % 2 == 0) ? 0 : (clamped + 1) / 2
+            if tile > highestTileVisited {
+                highestTileVisited = tile
+            }
+
         }
     }
 
@@ -145,3 +185,27 @@ final class ProgressionManager: ObservableObject {
     private static let kTotalFills  = "pm_totalFills_v1"
 
 }
+
+#if DEBUG
+extension ProgressionManager {
+    /// Simulate a pre-update install and force the v1.0.1 migration on next init.
+    /// - Parameter pretendTileVisited: 0 = Starter, 1 = Lab, 2 = next, etc.
+    static func debugStagePreUpdateState(pretendTileVisited: Int) {
+        let defaults = UserDefaults.standard
+        // Pretend we’re on the corresponding pre-update levelIndex
+        // tile 0 → levelIndex 0, tile N>0 → odd levelIndex 2*N - 1
+        let levelIndexPre = pretendTileVisited == 0 ? 0 : (2 * pretendTileVisited - 1)
+        defaults.set(levelIndexPre, forKey: kLevelIndex)
+        defaults.set(0.0, forKey: kCurProgress)
+
+        // Old app didn’t have these yet; ensure “pre-update” baseline
+        defaults.removeObject(forKey: "pm_mapLocked_v1")
+        defaults.removeObject(forKey: "pm_totalFills_v1")
+        defaults.removeObject(forKey: "highestTileVisited_v1")
+
+        // Force migration to run on next init
+        defaults.set(false, forKey: "didMigrateUnlocks_v101")
+        defaults.synchronize()
+    }
+}
+#endif

@@ -1882,9 +1882,6 @@ struct ContentView: View {
                                 // 1) Completion sting (unchanged)
                                 SoundManager.shared.play("complete_1")
 
-                                // 2) Count this fill
-                                progression.registerBarFill()
-
                                 // 3) Visual slide-down setup
                                 let oldTotal = Double(progression.currentBarTotal)
                                 let downAnimDur: Double = 0.45
@@ -1892,6 +1889,9 @@ struct ContentView: View {
                                 withTransaction(Transaction(animation: nil)) {
                                     barValueOverride = oldTotal
                                 }
+                                
+                                // 2) Count this fill
+                                progression.registerBarFill()
 
                                 // --- Only for LOCKED mode, clear the model *now* to avoid jitter ---
                                 if progression.mapLocked {
