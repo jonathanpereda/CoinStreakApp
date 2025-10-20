@@ -19,14 +19,33 @@ final class ProgressionManager: ObservableObject {
 
     // Total number of times the bar has filled (drives unlocks fairly)
     @Published var totalFills: Int {
-        didSet { UserDefaults.standard.set(totalFills, forKey: Self.kTotalFills) }
+        didSet {
+            UserDefaults.standard.set(totalFills, forKey: Self.kTotalFills)
+
+            // Ensure model progress is never >= new target (prevents stuck-full edge cases)
+            let cap = Double(currentBarTotal)
+            if currentProgress >= cap {
+                currentProgress = max(0, cap - 0.0001)
+            }
+        }
     }
     
     private let kDidMigrateUnlocks_v101 = "didMigrateUnlocks_v101"
     private let kHighestTileVisited     = "highestTileVisited_v1" // 0 = Starter
 
     @Published var highestTileVisited: Int {
-        didSet { UserDefaults.standard.set(highestTileVisited, forKey: kHighestTileVisited) }
+        didSet {
+            UserDefaults.standard.set(highestTileVisited, forKey: kHighestTileVisited)
+
+            // Self-heal unlocks at runtime as well
+            let maxMaps = 1 + nonStarterNames.count
+            let desiredUnlocked = min(highestTileVisited + 1, maxMaps)   // tiles → unlocked maps
+            let minTotalFills = max(0, 2 * desiredUnlocked - 3)          // arrival-based formula
+
+            if totalFills < minTotalFills {
+                totalFills = minTotalFills
+            }
+        }
     }
 
     // Unlock rule: starter always unlocked (1), then +1 map per every 2 fills.
@@ -114,6 +133,15 @@ final class ProgressionManager: ObservableObject {
             }
 
             UserDefaults.standard.set(true, forKey: kDidMigrateUnlocks_v101)
+        }
+        
+        // --- Self-heal: normalize saved progress against current target ---
+        let cap = Double(currentBarTotal)
+        if !currentProgress.isFinite || currentProgress < 0 {
+            currentProgress = 0
+        } else if currentProgress >= cap {
+            // Clamp just below "full" so the bar never loads in a stuck-full state
+            currentProgress = max(0, cap - 0.0001)
         }
     }
 

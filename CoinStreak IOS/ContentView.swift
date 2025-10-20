@@ -1478,10 +1478,13 @@ struct ContentView: View {
                             gameplayOpacity  = 1
                             phase            = .playing
                         }
+
+                        // NEW: register (safe if already registered)
+                        await ScoreboardAPI.register(installId: installId, side: face)
+
+                        // keep your existing state restore
                         if let state = await ScoreboardAPI.fetchState(installId: installId) {
-                            await MainActor.run {
-                                store.currentStreak = state.currentStreak  // always take server value
-                            }
+                            await MainActor.run { store.currentStreak = state.currentStreak }
                             StreakSync.shared.seedAcked(to: state.currentStreak)
                         }
                     } else {
@@ -1497,57 +1500,44 @@ struct ContentView: View {
                 baseFaceAtLaunch = store.chosenFace!.rawValue
                 gameplayOpacity  = 1
                 phase            = .playing
+
                 let installId = InstallIdentity.getOrCreateInstallId()
                 Task {
+                    // NEW: register (safe if already registered)
+                    await ScoreboardAPI.register(installId: installId, side: store.chosenFace!)
+
                     if let state = await ScoreboardAPI.fetchState(installId: installId) {
-                        await MainActor.run {
-                            store.currentStreak = state.currentStreak
-                        }
+                        await MainActor.run { store.currentStreak = state.currentStreak }
                         StreakSync.shared.seedAcked(to: state.currentStreak)
                     }
                 }
-
             }
-    
+
             // --- 3) One-time bootstrap (after side is known) ---
             if !didKickBootstrap {
                 didKickBootstrap = true
 
                 guard let side = store.chosenFace,
-                      BootstrapMarker.needsBootstrap() else { /* nothing to do */ return }
+                      BootstrapMarker.needsBootstrap() else { return }
 
                 let installId = InstallIdentity.getOrCreateInstallId()
-                let localBefore = store.currentStreak   // <- capture BEFORE we fetch server
+                let localBefore = store.currentStreak
 
                 Task {
                     if let state = await ScoreboardAPI.fetchState(installId: installId) {
-
-                        // If server doesn't know the streak but we do, bootstrap first.
                         if state.currentStreak == 0, localBefore > 0 {
                             await ScoreboardAPI.bootstrap(
-                                installId: installId,
-                                side: side,
-                                currentStreak: localBefore
+                                installId: installId, side: side, currentStreak: localBefore
                             )
                             StreakSync.shared.seedAcked(to: localBefore)
                             BootstrapMarker.markBootstrapped()
-
-                            // after bootstrapping, adopt local (now server=local)
-                            await MainActor.run {
-                                store.currentStreak = localBefore
-                            }
+                            await MainActor.run { store.currentStreak = localBefore }
                         } else {
-                            // Server already has a value → adopt it & mark bootstrapped
-                            await MainActor.run {
-                                store.currentStreak = state.currentStreak
-                            }
+                            await MainActor.run { store.currentStreak = state.currentStreak }
                             StreakSync.shared.seedAcked(to: state.currentStreak)
                             if state.currentStreak > 0 { BootstrapMarker.markBootstrapped() }
                         }
-
                     } else {
-                        // offline: don't bootstrap now; state will be reconciled on reconnect
-                        // (optional) seed to current local so replayer baseline is stable
                         StreakSync.shared.seedAcked(to: localBefore)
                     }
                 }
