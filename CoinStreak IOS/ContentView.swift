@@ -199,6 +199,48 @@ private struct BackwallThumb: View {
     }
 }
 
+private struct SettingsTile<Content: View>: View {
+    let size: CGFloat
+    let label: String?
+    let content: Content
+
+    init(size: CGFloat, label: String? = nil, @ViewBuilder content: () -> Content) {
+        self.size = size
+        self.label = label
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14)
+                .fill(.white.opacity(0.10))
+
+            VStack(spacing: 6) {
+                // icon or inner content
+                content
+                    .frame(maxHeight: .infinity)
+                    .padding(.top, 10)
+
+                // optional text label
+                if let label {
+                    Text(label)
+                        .font(.system(size: size * 0.1, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.4))
+                        .padding(.bottom, 2)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+            .frame(width: size * 0.9, height: size * 0.9)
+        }
+        .frame(width: size, height: size)
+        .shadow(color: .black.opacity(0.35), radius: 5, x: 0, y: 3)
+    }
+}
+
+
+
+
 
 // MARK: - COIN FLIP ANIM
 ///(uses coin_flip_HT / coin_flip_TH atlases)
@@ -704,6 +746,8 @@ struct ContentView: View {
     @StateObject private var scoreboardVM = ScoreboardVM()
     @State private var isScoreMenuOpen: Bool = false
     @State private var isLeaderboardOpen: Bool = false
+    @State private var isSettingsOpen: Bool = false
+
     
     // Map menu stuff
     @Environment(\.scenePhase) private var scenePhase
@@ -736,6 +780,8 @@ struct ContentView: View {
     @State private var bounceGen: Int = 0   // cancels any in-flight bounce sequence
     @State private var settleBounceT: Double = 1.0   // 0→1 drives bounce curve; 1 = idle
     @State private var currentFlipWasSuper = false
+    
+    @State private var disableTapFlip = false
 
     // App phase
     @State private var phase: AppPhase = .choosing
@@ -762,7 +808,6 @@ struct ContentView: View {
     @State private var barNonce = 0
     
     //MuteSounds
-    @State private var showAudioMenu = false
     @State private var sfxMutedUI   = SoundManager.shared.isSfxMuted
     @State private var musicMutedUI = SoundManager.shared.isMusicMuted
 
@@ -912,8 +957,9 @@ struct ContentView: View {
                         .onChange(of: progression.tierIndex) { _, _ in
                             barPulse = nil
                         }
-                        .opacity(isMapSelectOpen ? 0 : 1)
+                        .opacity((isMapSelectOpen || isSettingsOpen) ? 0 : 1)
                         .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+                        .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
 
 
                         Image(icon)
@@ -925,8 +971,9 @@ struct ContentView: View {
                             .shadow(color: iconPulse ? .yellow.opacity(0.5) : .clear,
                                     radius: iconPulse ? 3 : 0)
                             .animation(.easeOut(duration: 0.25), value: iconPulse)
-                            .opacity(isMapSelectOpen ? 0 : 1)
+                            .opacity((isMapSelectOpen || isSettingsOpen) ? 0 : 1)
                             .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+                            .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                     }
                     .padding(.trailing, geo.safeAreaInsets.trailing + extraRight)
                     .padding(.bottom, geo.safeAreaInsets.bottom + 36)
@@ -941,19 +988,23 @@ struct ContentView: View {
                         // Keep the whole block hidden during the choosing phase (same as before)
                         ZStack(alignment: .leading) {
 
-                            // === Buttons row (Map + Score) ===
+                            // === Buttons row (Map + Settings + Scoreboard) ===
                             HStack(spacing: 8) {
-                                // MAP button (unchanged)
+                                // MAP button
                                 Button {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
-                                        isMapSelectOpen.toggle()
+                                        if isSettingsOpen {
+                                            isSettingsOpen = false           // close Settings if it's open
+                                        } else {
+                                            isMapSelectOpen.toggle()
+                                        }
                                     }
                                 } label: {
                                     SquareHUDButton(
                                         isOutlined: showNewMapToast,
                                         outlineColor: Color(red: 0.35, green: 0.4, blue: 1.0)
                                     ) {
-                                        Image(systemName: isMapSelectOpen ? "xmark" : "map.fill")
+                                        Image(systemName: (isMapSelectOpen || isSettingsOpen) ? "xmark" : "map.fill")
                                             .resizable()
                                             .scaledToFit()
                                             .frame(width: 22, height: 22)
@@ -961,8 +1012,30 @@ struct ContentView: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
+                                
+                                // SETTINGS button (make it a real Button, like Map/Scoreboard)
+                                Button {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                        if isMapSelectOpen { isMapSelectOpen = false }   // opening settings closes map
+                                        isSettingsOpen.toggle()
+                                    }
+                                } label: {
+                                    SquareHUDButton(isOutlined: isSettingsOpen) {
+                                        Image(systemName: "gearshape.fill")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 22, height: 22)
+                                            .foregroundColor(.white.opacity(0.6))
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .opacity((isMapSelectOpen || isSettingsOpen) ? 0 : 1)
+                                .disabled(isMapSelectOpen || isSettingsOpen)
+                                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+                                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
 
-                                // NEW: SCORE menu button (opens/closes the top score overlay)
+
+                                // SCOREBOARD menu button (opens/closes the top score overlay)
                                 Button {
                                     withAnimation(.easeInOut(duration: 0.22)) {
                                         if isScoreMenuOpen {
@@ -983,9 +1056,10 @@ struct ContentView: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
-                                .opacity(isMapSelectOpen ? 0 : 1)
-                                .disabled(isMapSelectOpen)
+                                .opacity((isMapSelectOpen || isSettingsOpen) ? 0 : 1)
+                                .disabled(isMapSelectOpen || isSettingsOpen)
                                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+                                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                             }
 
                             // === Toast layer (always ABOVE buttons; same spacing you chose) ===
@@ -1096,8 +1170,10 @@ struct ContentView: View {
                     )
                     // 2) Tap → default random flip
                     .onTapGesture {
+                        guard !disableTapFlip else { return }
                         flipCoin()
                     }
+
 
 
                 }
@@ -1266,6 +1342,109 @@ struct ContentView: View {
                     }
                     .ignoresSafeArea(edges: .bottom)
                 }
+
+                // MARK: - SETTINGS MENU WINDOW
+                if isSettingsOpen {
+
+                    VStack {
+                        Spacer()
+                        HStack(alignment: .center, spacing: 12) {
+
+                            // Reserve the X area; don't intercept taps here
+                            Spacer()
+                                .frame(width: 46)
+                                .allowsHitTesting(false)
+
+                            // SETTINGS carousel
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 10) {
+                                    // MUSIC tile
+                                    SettingsTile(size: 90, label: "Music") {
+                                        ZStack {
+                                            Image(systemName: "music.note")
+                                                .font(.system(size: 90 * 0.34, weight: .semibold))
+                                                .foregroundColor(.white.opacity(0.8))
+                                            if musicMutedUI {
+                                                Rectangle()
+                                                    .fill(Color.red.opacity(0.5))
+                                                    .frame(width: 90 * 0.8, height: 3)
+                                                    .rotationEffect(.degrees(-45))
+                                            }
+                                        }
+                                    }
+                                    .onTapGesture {
+                                        SoundManager.shared.toggleMusicMuted()
+                                        musicMutedUI = SoundManager.shared.isMusicMuted
+                                        if musicMutedUI {
+                                            SoundManager.shared.stopLoop(fadeOut: 0.4)
+                                        } else {
+                                            let theme = tierTheme(for: progression.currentTierName)
+                                            updateTierLoop(theme)
+                                        }
+                                    }
+
+                                    // SFX tile
+                                    SettingsTile(size: 90, label: "Sounds Effects") {
+                                        ZStack {
+                                            Text("SFX")
+                                                .font(.system(size: 90 * 0.78 * 0.34, weight: .semibold))
+                                                .foregroundColor(.white.opacity(0.8))
+                                                .minimumScaleFactor(0.85)
+                                                .lineLimit(1)
+                                                .padding(.horizontal, 6)
+                                            if sfxMutedUI {
+                                                Rectangle()
+                                                    .fill(Color.red.opacity(0.5))
+                                                    .frame(width: 90 * 0.8, height: 3)
+                                                    .rotationEffect(.degrees(-45))
+                                            }
+                                        }
+                                    }
+                                    .onTapGesture {
+                                        SoundManager.shared.toggleSfxMuted()
+                                        sfxMutedUI = SoundManager.shared.isSfxMuted
+                                    }
+                                    
+                                    // TAP INPUT TOGGLE
+                                    SettingsTile(size: 90, label: "Tap to Flip") {
+                                        ZStack {
+                                            // finger.tap icon
+                                            Image(systemName: "hand.tap.fill")
+                                                .font(.system(size: 90 * 0.34, weight: .semibold))
+                                                .foregroundColor(.white.opacity(0.8))
+
+                                            // Red slash overlay when tap-to-flip is disabled
+                                            if disableTapFlip {
+                                                Rectangle()
+                                                    .fill(Color.red.opacity(0.5))
+                                                    .frame(width: 90 * 0.8, height: 3)
+                                                    .rotationEffect(.degrees(-35))
+                                            }
+                                        }
+                                    }
+                                    .onTapGesture {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            disableTapFlip.toggle()
+                                        }
+                                    }
+
+                                    
+                                }
+                                .padding(.vertical, 4)
+                                .padding(.trailing, 8)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 96)
+                            .offset(y: 24)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 10)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: min(180, UIScreen.main.bounds.height * 0.22))
+                    }
+                    .ignoresSafeArea(edges: .bottom)
+                }
+
 
 
 
@@ -1507,11 +1686,6 @@ struct ContentView: View {
                     .zIndex(999)
                     .ignoresSafeArea()
                 }
-            }
-            .overlay(alignment: .topTrailing) {
-                AudioMenuButton()
-                    .padding(.top, 6)
-                    .padding(.trailing, 6)
             }
             // Top score window that fades in at the very top (ignores safe area)
             .overlay(alignment: .topLeading) {
