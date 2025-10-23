@@ -12,6 +12,12 @@ enum ScoreboardAPI {
     }
 
     static func retireKeepingSide(installId: String) async {
+        
+        #if DEBUG
+        print("⚠️ [DEBUG] Skipping retireKeepingSide() write")
+        return
+        #endif
+        
         let url = base.appendingPathComponent("/v1/retire-and-keep-side")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -37,6 +43,12 @@ enum ScoreboardAPI {
     }
 
     static func register(installId: String, side: Face) async {
+        
+        #if DEBUG
+        print("⚠️ [DEBUG] Skipping register() write")
+        return
+        #endif
+        
         let url = base.appendingPathComponent("/v1/register")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -66,6 +78,12 @@ extension ScoreboardAPI {
     }
 
     static func bootstrap(installId: String, side: Face, currentStreak: Int) async {
+        
+        #if DEBUG
+        print("⚠️ [DEBUG] Skipping bootstrap() write")
+        return
+        #endif
+        
         let url = base.appendingPathComponent("/v1/bootstrap")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -91,6 +109,12 @@ extension ScoreboardAPI {
 extension ScoreboardAPI {
     @discardableResult
     static func streak(installId: String, newCurrentStreak: Int) async -> Bool {
+        
+        #if DEBUG
+        print("⚠️ [DEBUG] Skipping streak() write")
+        return true   // treat as success locally
+        #endif
+        
         let url = base.appendingPathComponent("/v1/streak")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"

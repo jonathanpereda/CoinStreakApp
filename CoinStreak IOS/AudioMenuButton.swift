@@ -77,12 +77,12 @@ struct AudioMenuButton: View {
                             Image(systemName: "music.note")
                                 .font(.system(size: iconSize, weight: .semibold))
                                 .foregroundColor(.white)
-                                .overlay(alignment: .topTrailing) {
+                                .overlay {
                                     if musicMuted {
-                                        Image(systemName: "slash.circle.fill")
-                                            .font(.system(size: 20))
-                                            .foregroundColor(.red.opacity(0.9))
-                                            .offset(x: 6, y: -6)
+                                        Rectangle()
+                                            .fill(Color.red.opacity(0.5))
+                                            .frame(width: buttonSize * 0.8, height: 3) // line width & thickness
+                                            .rotationEffect(.degrees(-45))
                                     }
                                 }
                         }
@@ -97,14 +97,30 @@ struct AudioMenuButton: View {
                         sfxMuted = SoundManager.shared.isSfxMuted
                     } label: {
                         iconOnly(size: buttonSize) {
-                            Image(systemName: sfxMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                                .font(.system(size: iconSize, weight: .semibold))
+                            // Slightly smaller than iconSize + add breathing room
+                            Text("SFX")
+                                .font(.system(size: iconSize * 0.78, weight: .semibold))
                                 .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)        // safety net on smaller devices
+                                .padding(.horizontal, 6)         // keeps it off the button walls
+                                .overlay {
+                                    if sfxMuted {
+                                        Rectangle()
+                                            .fill(Color.red.opacity(0.5))
+                                            .frame(width: buttonSize * 0.8, height: 3) // line width & thickness
+                                            .rotationEffect(.degrees(-25))
+                                    }
+                                }
+
                         }
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(sfxMuted ? "Sound effects muted" : "Sound effects on")
                     .transition(.move(edge: .top).combined(with: .opacity))
+
+
+
                 }
             }
             .padding(.vertical, isOpen ? verticalPad : 0)

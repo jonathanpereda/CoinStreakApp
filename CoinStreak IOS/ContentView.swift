@@ -46,6 +46,39 @@ private func tabWidth() -> CGFloat {
 
 // MARK: - MAP MENU
 
+private struct SquareHUDButton<Content: View>: View {
+    let isOutlined: Bool
+    let outlineColor: Color
+    let content: Content
+
+    init(
+        isOutlined: Bool = false,
+        outlineColor: Color = .white,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.isOutlined = isOutlined
+        self.outlineColor = outlineColor
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(.ultraThinMaterial.opacity(0.3))
+                .shadow(radius: 3)
+
+            content
+                .frame(width: 22, height: 22)
+        }
+        .frame(width: 36, height: 36)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(outlineColor.opacity(isOutlined ? 0.9 : 0.0), lineWidth: isOutlined ? 2 : 0)
+                .shadow(color: outlineColor.opacity(isOutlined ? 0.75 : 0), radius: isOutlined ? 5 : 0)
+        )
+    }
+}
+
 private struct MapItem: Identifiable, Equatable {
     let id: Int        // 0 = Starter, 1... = non-starters in order
     let name: String
@@ -669,7 +702,8 @@ struct ContentView: View {
     @State private var didRestorePhase = false
     @State private var didKickBootstrap = false
     @StateObject private var scoreboardVM = ScoreboardVM()
-    @State private var scoreboardOpen = false
+    @State private var isScoreMenuOpen: Bool = false
+    @State private var isLeaderboardOpen: Bool = false
     
     // Map menu stuff
     @Environment(\.scenePhase) private var scenePhase
@@ -895,31 +929,66 @@ struct ContentView: View {
                             .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                     }
                     .padding(.trailing, geo.safeAreaInsets.trailing + extraRight)
-                    .padding(.bottom, geo.safeAreaInsets.bottom + 24)
+                    .padding(.bottom, geo.safeAreaInsets.bottom + 36)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .allowsHitTesting(false)
                     .zIndex(50)                // keep above table/gameplay
                     .transition(.opacity)
                     
                     //OPEN MAP MENU BUTTON
+                    // Replace your existing .overlay(alignment: .bottomLeading) { ... } block with this:
                     .overlay(alignment: .bottomLeading) {
+                        // Keep the whole block hidden during the choosing phase (same as before)
                         ZStack(alignment: .leading) {
-                            Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
-                                    isMapSelectOpen.toggle()
+
+                            // === Buttons row (Map + Score) ===
+                            HStack(spacing: 8) {
+                                // MAP button (unchanged)
+                                Button {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                        isMapSelectOpen.toggle()
+                                    }
+                                } label: {
+                                    SquareHUDButton(
+                                        isOutlined: showNewMapToast,
+                                        outlineColor: Color(red: 0.35, green: 0.4, blue: 1.0)
+                                    ) {
+                                        Image(systemName: isMapSelectOpen ? "xmark" : "map.fill")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 22, height: 22)
+                                            .foregroundColor(.white.opacity(0.6))
+                                    }
                                 }
-                            } label: {
-                                Image(systemName: isMapSelectOpen ? "xmark" : "map.fill")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 22, height: 22)
-                                    .foregroundColor(.white.opacity(0.6))
-                                    .padding(7)
-                                    .background(.ultraThinMaterial.opacity(0.3))
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    .shadow(radius: 3)
+                                .buttonStyle(.plain)
+
+                                // NEW: SCORE menu button (opens/closes the top score overlay)
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.22)) {
+                                        if isScoreMenuOpen {
+                                            isLeaderboardOpen = false
+                                            isScoreMenuOpen = false
+                                        } else {
+                                            isScoreMenuOpen = true
+                                        }
+                                    }
+                                } label: {
+                                    SquareHUDButton(isOutlined: isScoreMenuOpen) {
+                                        Image("scoreboard_menu_icon")
+                                            .resizable()
+                                            .interpolation(.high)
+                                            .scaledToFit()
+                                            .frame(width: 22, height: 22)
+                                            .opacity(0.8)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .opacity(isMapSelectOpen ? 0 : 1)
+                                .disabled(isMapSelectOpen)
+                                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                             }
-                            // Toast bubble – only when menu is CLOSED
+
+                            // === Toast layer (always ABOVE buttons; same spacing you chose) ===
                             if !isMapSelectOpen && showNewMapToast {
                                 RoundedRectangle(cornerRadius: 6)
                                     .fill(
@@ -939,19 +1008,22 @@ struct ContentView: View {
                                             .padding(.horizontal, 12),
                                         alignment: .leading
                                     )
-                                    // start exactly to the right of the 40pt map button
+                                    // Keep your original “start exactly to the right of the 40pt map button”
                                     .padding(.leading, 40)
                                     .offset(y: 0)
                                     .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
                                     .transition(.opacity)
                                     .animation(.easeInOut(duration: 0.5), value: showNewMapToast)
+                                    .allowsHitTesting(false) // taps pass through to buttons underneath
+                                    .zIndex(999)            // <<< ensures it sits above ANY buttons to the right
                             }
-
-
                         }
                         .padding(.leading, 24)
-                        .padding(.bottom, 25)
+                        .padding(.bottom, 30)
+                        .opacity(phase != .choosing ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.2), value: phase)
                     }
+
 
                 }
 
@@ -1441,14 +1513,17 @@ struct ContentView: View {
                     .padding(.top, 6)
                     .padding(.trailing, 6)
             }
-            .overlay(alignment: .trailing) {
-                if store.chosenFace != nil {
-                    SlidingScoreboardPanel(vm: scoreboardVM)
-                        .padding(.trailing, 0) // keep flush to screen edge
-                        .offset(y: -32)
-                        .zIndex(0)             // behind your coin if needed
-                }
+            // Top score window that fades in at the very top (ignores safe area)
+            .overlay(alignment: .topLeading) {
+                TopScoreboardOverlay(
+                    vm: scoreboardVM,
+                    isOpen: $isScoreMenuOpen,
+                    isLeaderboardOpen: $isLeaderboardOpen
+                )
+                .opacity(store.chosenFace != nil ? 1 : 0) // only after a side is chosen
+                .ignoresSafeArea(edges: .top)             // sit flush against the top curves
             }
+
 
 
 
@@ -1604,7 +1679,8 @@ struct ContentView: View {
             }
             lastUnlockedCount = new
         }
-
+        
+        .statusBarHidden(true)
 
     }
     
