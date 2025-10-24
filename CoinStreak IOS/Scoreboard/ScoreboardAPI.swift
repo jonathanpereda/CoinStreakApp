@@ -14,7 +14,7 @@ enum ScoreboardAPI {
     static func retireKeepingSide(installId: String) async {
         
         #if DEBUG
-        print("⚠️ [DEBUG] Skipping retireKeepingSide() write")
+        print("[DEBUG] Skipping retireKeepingSide() write")
         return
         #endif
         
@@ -45,7 +45,7 @@ enum ScoreboardAPI {
     static func register(installId: String, side: Face) async {
         
         #if DEBUG
-        print("⚠️ [DEBUG] Skipping register() write")
+        print("[DEBUG] Skipping register() write")
         return
         #endif
         
@@ -80,7 +80,7 @@ extension ScoreboardAPI {
     static func bootstrap(installId: String, side: Face, currentStreak: Int) async {
         
         #if DEBUG
-        print("⚠️ [DEBUG] Skipping bootstrap() write")
+        print("[DEBUG] Skipping bootstrap() write")
         return
         #endif
         
@@ -111,7 +111,7 @@ extension ScoreboardAPI {
     static func streak(installId: String, newCurrentStreak: Int) async -> Bool {
         
         #if DEBUG
-        print("⚠️ [DEBUG] Skipping streak() write")
+        print("[DEBUG] Skipping streak() write")
         return true   // treat as success locally
         #endif
         

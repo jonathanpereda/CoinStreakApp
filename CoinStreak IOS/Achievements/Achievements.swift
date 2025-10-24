@@ -2,8 +2,8 @@
 import Foundation
 
 enum AchievementID: String, CaseIterable, Codable, Hashable {
-    case highFlyer // “breaks threshold super swipe + thud”
-    // add more here later…
+    case highFlyer
+    case unlucky
 }
 
 struct Achievement: Identifiable, Codable, Hashable {
@@ -22,6 +22,13 @@ enum AchievementsCatalog {
             shortBlurb: "Flip the coin off the screen",
             thumbName: "trophy_highflyer_thumb", // export a simple PNG; placeholder ok
             silhouetteName: "trophy_highflyer_sil"
+        ),
+        .init(
+            id: .unlucky,
+            name: "Unlucky",
+            shortBlurb: "Lose 10 times in a row",
+            thumbName: "trophy_unlucky_thumb", // export a simple PNG; placeholder ok
+            silhouetteName: "trophy_unlucky_sil"
         ),
     ]
 

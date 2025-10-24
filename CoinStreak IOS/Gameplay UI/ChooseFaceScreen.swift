@@ -2,19 +2,10 @@ import SwiftUI
 
 // === Sprite helpers ===
 
-private enum CoinSide: String { case H = "Heads", T = "Tails" }
-
-private struct SpriteFlipPlan: Equatable {
-    let startFace: CoinSide
-    let endFace:   CoinSide
-    let halfTurns: Int       // number of half flips (HT or TH alternations)
-    let startTime: Date
-    let duration:  Double
-}
 
 // chooser uses the same “large alpha box” correction as gameplay.
 // ************If you change the main tweak later, mirror the numbers here.***************
-private struct CoinVisualTweak { let scale: CGFloat; let nudgeY: CGFloat }
+//private struct CoinVisualTweak { let scale: CGFloat; let nudgeY: CGFloat }
 private let ChooseCoinTweak = CoinVisualTweak(scale: 2.7, nudgeY: -48)
 
 // atlas frame names are coin_HT_0001...0036 and coin_TH_0001...0036
@@ -34,28 +25,6 @@ private func buildAtlasRun(start: CoinSide, halfTurns: Int) -> [(prefix: String,
         cur = next
     }
     return list
-}
-
-private func spriteFrameFor(plan: SpriteFlipPlan, now: Date) -> String {
-    let elapsed = max(0, now.timeIntervalSince(plan.startTime))
-    let t = min(elapsed, plan.duration)
-
-    let atlases = buildAtlasRun(start: plan.startFace, halfTurns: plan.halfTurns)
-    let totalFrames = atlases.reduce(0) { $0 + $1.count - ($1.skipFirst ? 1 : 0) }
-    let idx = Int(round((t / max(plan.duration, 0.0001)) * Double(totalFrames - 1)))
-
-    var remaining = idx
-    for (prefix, count, skip) in atlases {
-        let effective = count - (skip ? 1 : 0)
-        if remaining < effective {
-            let local1 = remaining + (skip ? 2 : 1)
-            return atlasFrameName(prefix: prefix, idx1based: local1)
-        }
-        remaining -= effective
-    }
-    // Fallback: last frame of the final sequence
-    let finalPrefix = (plan.endFace == .H) ? "coin_TH" : "coin_HT"
-    return atlasFrameName(prefix: finalPrefix, idx1based: 36)
 }
 
 // Minimal sprite image view mirroring gameplay component

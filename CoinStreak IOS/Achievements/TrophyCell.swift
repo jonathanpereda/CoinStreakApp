@@ -34,7 +34,7 @@ struct TrophyCell: View {
                 }
                 .frame(maxHeight: .infinity)
 
-                Text(isUnlocked ? achievement.name : "????")
+                Text(isUnlocked ? achievement.name : "?????")
                     .font(.system(size: size * 0.10, weight: .semibold))
                     .foregroundColor(.white.opacity(isUnlocked ? 0.85 : 0.45))
                     .padding(.bottom, 6)
