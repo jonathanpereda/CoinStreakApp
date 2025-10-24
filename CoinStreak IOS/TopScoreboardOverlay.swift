@@ -161,6 +161,30 @@ struct TopScoreboardOverlay: View {
                             .allowsHitTesting(false)
                             .zIndex(2)
                     }
+                    
+                    // OFFLINE BADGE — bottom-right of the score menu (same look as before)
+                    if !vm.isOnline {
+                        HStack(spacing: 6) {
+                            Image(systemName: "wifi.slash")
+                                .font(.system(size: 11, weight: .bold))
+                            Text("Offline")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundStyle(.white.opacity(0.92))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.black.opacity(0.35))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(Color.white.opacity(0.25), lineWidth: 0.5)
+                        )
+                        .padding(.trailing, 14)  // tweak to taste
+                        .padding(.bottom, 26)     // tweak to taste
+                        .frame(width: menuContainerWidth, height: Art.menuH * s, alignment: .bottomTrailing)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                        .zIndex(3)
+                    }
                 }
                 .frame(width: menuContainerWidth, height: Art.menuH * s, alignment: .topLeading)
                 .offset(x: menuShiftX, y: menuShiftY)

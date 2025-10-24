@@ -214,6 +214,7 @@ private struct SettingsTile<Content: View>: View {
         ZStack {
             RoundedRectangle(cornerRadius: 14)
                 .fill(.white.opacity(0.10))
+                .shadow(radius: 4)
 
             VStack(spacing: 6) {
                 // icon or inner content
@@ -238,8 +239,12 @@ private struct SettingsTile<Content: View>: View {
     }
 }
 
-
-
+struct TrophyAnchorKey: PreferenceKey {
+    static var defaultValue: [AchievementID: Anchor<CGRect>] = [:]
+    static func reduce(value: inout [AchievementID: Anchor<CGRect>], nextValue: () -> [AchievementID: Anchor<CGRect>]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
 
 
 // MARK: - COIN FLIP ANIM
@@ -464,71 +469,6 @@ private func flightParams(
 }
 
 
-
-
-
-///OLD coin flipping animation
-/*struct FlippingCoin: View, Animatable {
-    var angle: Double
-    var targetAngle: Double
-    var baseFace: String
-    var width: CGFloat
-    var position: CGPoint
-
-    var animatableData: Double {
-        get { angle }
-        set { angle = newValue }
-    }
-
-    private func flipped(_ s: String) -> String { s == "Heads" ? "Tails" : "Heads" }
-    private func imageName(for face: String) -> String { face == "Tails" ? "coin_tails" : "coin_heads" }
-
-    private let tiltMag: CGFloat = 0.20
-    private let backScale: CGFloat = 0.14
-    private let pitchX: Double = -6
-    private let perspective: CGFloat = 0.51
-
-    var body: some View {
-        let a = (angle.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
-        let seeingBack = (a >= 90 && a < 270)
-        let face = seeingBack ? flipped(baseFace) : baseFace
-        let flipX: CGFloat = seeingBack ? -1 : 1
-
-        let rad = a * .pi / 180
-        let mag = seeingBack ? backScale : 1
-        
-        // NEW: zero tilt at rest (a ≈ 0 or 180), max around mid-flight.
-        // Also clamp tiny values so we don’t see a micro skew.
-        var signedTilt: CGFloat = tiltMag * mag * CGFloat(sin(rad))
-        if abs(signedTilt) < 0.001 { signedTilt = 0 }   // snap truly flat at rest
-
-        let vx = signedTilt, vy: CGFloat = 1
-        let len = sqrt(vx*vx + vy*vy)
-        let ax = vx / max(len, 0.0001), ay = vy / max(len, 0.0001)
-
-        return Image(imageName(for: face))
-            .resizable()
-            .interpolation(.high)
-            .aspectRatio(contentMode: .fit)
-            .frame(width: width)
-            .compositingGroup()
-            .scaleEffect(x: flipX, y: 1, anchor: .center)
-            .rotation3DEffect(.degrees(pitchX),
-                              axis: (x: 1, y: 0, z: 0),
-                              anchor: .center,
-                              perspective: perspective)          // ← was default (nonzero)
-
-            .rotation3DEffect(.degrees(a),
-                              axis: (x: ax, y: ay, z: 0),
-                              anchor: .center,
-                              perspective: perspective)          // ← was 0.51
-            .position(position)
-            .animation(nil, value: face)
-    }
-}
-*/
-
-
 // MARK: TIER THEMES
 ///Central theme for each tier: backwall art + font
 private struct TierTheme {
@@ -747,6 +687,14 @@ struct ContentView: View {
     @State private var isScoreMenuOpen: Bool = false
     @State private var isLeaderboardOpen: Bool = false
     @State private var isSettingsOpen: Bool = false
+    
+    // Achievement Stuff
+    @StateObject private var achievements = AchievementsStore()
+    @State private var isTrophiesOpen: Bool = false
+    @State private var showNewTrophyToast: Bool = false
+    @State private var activeTooltip: AchievementID? = nil
+    @State private var tooltipHideWorkItem: DispatchWorkItem?
+
 
     
     // Map menu stuff
@@ -781,7 +729,8 @@ struct ContentView: View {
     @State private var settleBounceT: Double = 1.0   // 0→1 drives bounce curve; 1 = idle
     @State private var currentFlipWasSuper = false
     
-    @State private var disableTapFlip = false
+    @AppStorage("disableTapFlip") private var disableTapFlip = false
+
 
     // App phase
     @State private var phase: AppPhase = .choosing
@@ -957,9 +906,11 @@ struct ContentView: View {
                         .onChange(of: progression.tierIndex) { _, _ in
                             barPulse = nil
                         }
-                        .opacity((isMapSelectOpen || isSettingsOpen) ? 0 : 1)
+                        .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
                         .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                         .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
+                        .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+
 
 
                         Image(icon)
@@ -971,9 +922,10 @@ struct ContentView: View {
                             .shadow(color: iconPulse ? .yellow.opacity(0.5) : .clear,
                                     radius: iconPulse ? 3 : 0)
                             .animation(.easeOut(duration: 0.25), value: iconPulse)
-                            .opacity((isMapSelectOpen || isSettingsOpen) ? 0 : 1)
+                            .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
                             .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                             .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
+                            .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
                     }
                     .padding(.trailing, geo.safeAreaInsets.trailing + extraRight)
                     .padding(.bottom, geo.safeAreaInsets.bottom + 36)
@@ -988,13 +940,19 @@ struct ContentView: View {
                         // Keep the whole block hidden during the choosing phase (same as before)
                         ZStack(alignment: .leading) {
 
+                            var anyBottomSheetOpen: Bool {
+                                isMapSelectOpen || isSettingsOpen || isTrophiesOpen
+                            }
+                            
                             // === Buttons row (Map + Settings + Scoreboard) ===
                             HStack(spacing: 8) {
                                 // MAP button
                                 Button {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                                         if isSettingsOpen {
-                                            isSettingsOpen = false           // close Settings if it's open
+                                            isSettingsOpen = false           // close Settings if open
+                                        } else if isTrophiesOpen {
+                                            isTrophiesOpen = false           // close Trophies if open
                                         } else {
                                             isMapSelectOpen.toggle()
                                         }
@@ -1004,7 +962,7 @@ struct ContentView: View {
                                         isOutlined: showNewMapToast,
                                         outlineColor: Color(red: 0.35, green: 0.4, blue: 1.0)
                                     ) {
-                                        Image(systemName: (isMapSelectOpen || isSettingsOpen) ? "xmark" : "map.fill")
+                                        Image(systemName: anyBottomSheetOpen ? "xmark" : "map.fill")
                                             .resizable()
                                             .scaledToFit()
                                             .frame(width: 22, height: 22)
@@ -1012,6 +970,34 @@ struct ContentView: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
+                                
+                                // TROPHIES button
+                                Button {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                        if isMapSelectOpen { isMapSelectOpen = false }
+                                        if isSettingsOpen { isSettingsOpen = false }
+                                        isTrophiesOpen.toggle()
+                                    }
+                                } label: {
+                                    SquareHUDButton(
+                                        isOutlined: showNewTrophyToast,
+                                        outlineColor: Color(red: 1.0, green: 0.8, blue: 0.2)
+                                    ) {
+                                        Image(systemName: "trophy.fill")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 22, height: 22)
+                                            .foregroundColor(.white.opacity(0.7))
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
+                                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
+                                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+                                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
+                                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+
+
                                 
                                 // SETTINGS button (make it a real Button, like Map/Scoreboard)
                                 Button {
@@ -1029,10 +1015,12 @@ struct ContentView: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
-                                .opacity((isMapSelectOpen || isSettingsOpen) ? 0 : 1)
-                                .disabled(isMapSelectOpen || isSettingsOpen)
+                                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
+                                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
                                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
+                                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+
 
 
                                 // SCOREBOARD menu button (opens/closes the top score overlay)
@@ -1056,14 +1044,16 @@ struct ContentView: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
-                                .opacity((isMapSelectOpen || isSettingsOpen) ? 0 : 1)
-                                .disabled(isMapSelectOpen || isSettingsOpen)
+                                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
+                                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
                                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
+                                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+
                             }
 
                             // === Toast layer (always ABOVE buttons; same spacing you chose) ===
-                            if !isMapSelectOpen && showNewMapToast {
+                            if !anyBottomSheetOpen && showNewMapToast {
                                 RoundedRectangle(cornerRadius: 6)
                                     .fill(
                                         LinearGradient(
@@ -1091,6 +1081,37 @@ struct ContentView: View {
                                     .allowsHitTesting(false) // taps pass through to buttons underneath
                                     .zIndex(999)            // <<< ensures it sits above ANY buttons to the right
                             }
+                            
+                            // === Trophy toast (mirrors your map toast positioning) ===
+                            if !anyBottomSheetOpen && showNewTrophyToast {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.95, green: 0.78, blue: 0.10, opacity: 0.96),
+                                                Color(red: 1.00, green: 0.55, blue: 0.18, opacity: 0.96)
+                                            ],
+                                            startPoint: .leading, endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: 170, height: 24, alignment: .leading)
+                                    .overlay(
+                                        Text("New trophy unlocked")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(.black.opacity(0.85))
+                                            .padding(.horizontal, 12),
+                                        alignment: .leading
+                                    )
+                                    .padding(.leading, 40) // start to the right of the 36pt button + 4pt gap
+                                    .offset(y: 28)         // tiny stagger under the map toast line if both ever overlap
+                                    .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
+                                    .transition(.opacity)
+                                    .animation(.easeInOut(duration: 0.5), value: showNewTrophyToast)
+                                    .allowsHitTesting(false)
+                                    .zIndex(999)
+                            }
+
+                            
                         }
                         .padding(.leading, 24)
                         .padding(.bottom, 30)
@@ -1141,7 +1162,8 @@ struct ContentView: View {
                     }
                     .modifier(SettleWiggle(t: settleT))
                     .modifier(SettleBounce(t: settleBounceT))
-                    .contentShape(Rectangle())
+                    .allowsHitTesting(false)
+                    /*.contentShape(Rectangle())
                     // 1) Swipe up → impulse flip
                     .gesture(
                         DragGesture(minimumDistance: 10, coordinateSpace: .local)
@@ -1172,15 +1194,59 @@ struct ContentView: View {
                     .onTapGesture {
                         guard !disableTapFlip else { return }
                         flipCoin()
-                    }
-
-
-
+                    }*/
+                    
                 }
                 .opacity(gameplayOpacity)                 // <— no animation; see onReveal below
                 .allowsHitTesting(phase == .playing)      // disable taps until playing
 
 
+                // INPUT BOUNDARIES
+                if phase == .playing {
+                    // Tune these two lines to adjust the band:
+                    let topSafeInset: CGFloat    = max(geo.safeAreaInsets.top,     H * 0.22)
+                    let bottomSafeInset: CGFloat = max(geo.safeAreaInsets.bottom,  H * 0.055)
+
+                    let bandMinY: CGFloat   = topSafeInset
+                    let bandMaxY: CGFloat   = H - bottomSafeInset
+                    let bandHeight: CGFloat = max(0, bandMaxY - bandMinY)
+
+                    Rectangle()
+                        .fill(Color.clear) // set to .red.opacity(0.25) when debugging
+                        .frame(width: W, height: bandHeight)
+                        .position(x: W/2, y: bandMinY + bandHeight/2)
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                                .onEnded { v in
+                                    guard !isFlipping, !isTierTransitioning else { return }
+                                    // Only accept gestures that START inside the band
+                                    let startY = v.startLocation.y
+                                    guard startY >= bandMinY && startY <= bandMaxY else { return }
+
+                                    let dx = v.translation.width
+                                    let dy = v.translation.height
+                                    if hypot(dx, dy) < 10 {
+                                        guard !disableTapFlip else { return }
+                                        flipCoin()
+                                    } else {
+                                        let up = max(0, -dy)
+                                        let predUp = max(0, -v.predictedEndTranslation.height)
+                                        let extra = max(0, predUp - up)
+                                        let raw = Double(up) + 0.5 * Double(extra)
+                                        let impulse = raw / Double(H * 0.70)
+                                        if impulse > 0.15 { flipCoin(impulse: impulse) }
+                                    }
+                                }
+                        )
+                        // IMPORTANT: keep below panels so they remain tappable
+                        // .zIndex(0)  // (you can omit this; default is fine)
+                }
+
+
+
+
+            
 
                 // Recent flips pillar: bottom fixed at a baseline, grows upward
                 if phase != .choosing, !store.recent.isEmpty {
@@ -1342,6 +1408,59 @@ struct ContentView: View {
                     }
                     .ignoresSafeArea(edges: .bottom)
                 }
+                
+                // MARK: - TROPHIES MENU WINDOW
+                if isTrophiesOpen {
+                    VStack {
+                        Spacer()
+                        HStack(alignment: .center, spacing: 12) {
+                            Spacer().frame(width: 46).allowsHitTesting(false)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 10) {
+                                    ForEach(AchievementsCatalog.all) { ach in
+                                        let unlocked = achievements.isUnlocked(ach.id)
+
+                                        TrophyCell(
+                                            achievement: ach,
+                                            isUnlocked: unlocked,
+                                            isActive: activeTooltip == ach.id
+                                        ) {
+                                            // toggle the inline tooltip
+                                            if activeTooltip == ach.id {
+                                                withAnimation(.easeInOut(duration: 0.15)) { activeTooltip = nil }
+                                                tooltipHideWorkItem?.cancel()
+                                            } else {
+                                                activeTooltip = ach.id
+                                                tooltipHideWorkItem?.cancel()
+                                                let work = DispatchWorkItem {
+                                                    withAnimation(.easeInOut(duration: 0.2)) { activeTooltip = nil }
+                                                }
+                                                tooltipHideWorkItem = work
+                                                withAnimation(.easeInOut(duration: 0.15)) { /* fade handled by .transition */ }
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: work)
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                                .padding(.trailing, 8)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 96)
+                            .offset(y: 24)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 10)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: min(180, UIScreen.main.bounds.height * 0.22))
+                    }
+                    .ignoresSafeArea(edges: .bottom)
+                }
+
+
+
+                
 
                 // MARK: - SETTINGS MENU WINDOW
                 if isSettingsOpen {
@@ -2050,6 +2169,41 @@ struct ContentView: View {
             // If this was a “super” swipe, also do the dust burst + thud like hero drop
             if currentFlipWasSuper {
                 triggerDustImpactFromLanding()
+                
+                // ACHIEVEMENT: High Flyer
+                /*if achievements.unlock(.highFlyer) {
+                    // show a brief toast + glow the Trophies button
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                        showNewTrophyToast = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                            showNewTrophyToast = false
+                        }
+                    }
+                    // sfx
+                    SoundManager.shared.play("complete_1")
+                }*/
+                
+                // ACHIEVEMENT: High Flyer
+                if achievements.isUnlocked(.highFlyer) {
+                    // For testing: relock it
+                    achievements.lock(.highFlyer)   // ← add this method if you don't already have one
+                    print("High Flyer relocked for testing.")
+                } else if achievements.unlock(.highFlyer) {
+                    // Normal unlock flow
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                        showNewTrophyToast = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                            showNewTrophyToast = false
+                        }
+                    }
+                    SoundManager.shared.play("complete_1")
+                }
+
+                
                 currentFlipWasSuper = false
             }
 
