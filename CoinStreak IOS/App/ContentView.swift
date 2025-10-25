@@ -47,9 +47,6 @@ struct ContentView: View {
     @State private var tooltipHideWorkItem: DispatchWorkItem?
     @AppStorage("ach.progress.unlucky_wrong10")
     private var unluckyWrong10: Int = 0
-
-
-
     
     // Map menu stuff
     @Environment(\.scenePhase) private var scenePhase
@@ -60,7 +57,6 @@ struct ContentView: View {
     @State private var showCycleHint = false
     @State private var cycleHintText = "Cycle: On"
 
-    
     @State private var curState = "Heads"
 
     // animation state
@@ -82,8 +78,6 @@ struct ContentView: View {
     @State var bounceGen: Int = 0   // cancels any in-flight bounce sequence
     @State private var settleBounceT: Double = 1.0   // 0→1 drives bounce curve; 1 = idle
     @State private var currentFlipWasSuper = false
-    
-    @AppStorage("disableTapFlip") private var disableTapFlip = false
 
 
     // App phase
@@ -110,9 +104,11 @@ struct ContentView: View {
     @State private var lastTierName: String = "Starter"
     @State private var barNonce = 0
     
-    //MuteSounds
+    //Settings
     @State private var sfxMutedUI   = SoundManager.shared.isSfxMuted
     @State private var musicMutedUI = SoundManager.shared.isMusicMuted
+    @State private var hapticsEnabledUI = Haptics.shared.isEnabled
+    @AppStorage("disableTapFlip") private var disableTapFlip = false
 
 
     @ViewBuilder
@@ -429,9 +425,9 @@ struct ContentView: View {
                                             .padding(.horizontal, 12),
                                         alignment: .leading
                                     )
-                                    .padding(.leading, 40)
-                                    .offset(y: 0)
-                                    .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
+                                    .padding(.leading, 0)
+                                    .offset(y: -31)
+                                    .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
                                     .transition(.opacity)
                                     .animation(.easeInOut(duration: 0.5), value: showNewMapToast)
                                     .allowsHitTesting(false) // taps pass through to buttons underneath
@@ -458,9 +454,9 @@ struct ContentView: View {
                                             .padding(.horizontal, 12),
                                         alignment: .leading
                                     )
-                                    .padding(.leading, 40) // start to the right of the 36pt button + 4pt gap
-                                    .offset(y: 28)         // tiny stagger under the map toast line if both ever overlap
-                                    .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
+                                    .padding(.leading, 45)
+                                    .offset(y: -31)
+                                    .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
                                     .transition(.opacity)
                                     .animation(.easeInOut(duration: 0.5), value: showNewTrophyToast)
                                     .allowsHitTesting(false)
@@ -848,7 +844,7 @@ struct ContentView: View {
                                         sfxMutedUI = SoundManager.shared.isSfxMuted
                                     }
                                     
-                                    // TAP INPUT TOGGLE
+                                    // TAP INPUT tile
                                     SettingsTile(size: 90, label: "Tap to Flip") {
                                         ZStack {
                                             // finger.tap icon
@@ -870,6 +866,33 @@ struct ContentView: View {
                                             disableTapFlip.toggle()
                                         }
                                     }
+                                    
+                                    // HAPTICS tile
+                                    SettingsTile(size: 90, label: "Haptics") {
+                                        ZStack {
+                                            // Use a clear, device-y glyph
+                                            Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                                                .font(.system(size: 90 * 0.34, weight: .semibold))
+                                                .foregroundColor(.white.opacity(0.8))
+                                            if !hapticsEnabledUI {
+                                                Rectangle()
+                                                    .fill(Color.red.opacity(0.5))
+                                                    .frame(width: 90 * 0.8, height: 3)
+                                                    .rotationEffect(.degrees(-45))
+                                            }
+                                        }
+                                    }
+                                    .onTapGesture {
+                                        // toggle
+                                        hapticsEnabledUI.toggle()
+                                        Haptics.shared.isEnabled = hapticsEnabledUI
+
+                                        // if enabling, give a tiny confirmation tap
+                                        if hapticsEnabledUI {
+                                            Haptics.shared.tap()
+                                        }
+                                    }
+
 
                                     
                                 }
@@ -952,6 +975,9 @@ struct ContentView: View {
 
                                 // 5) Resume polling (or let onAppear do it)
                                 scoreboardVM.startPolling()
+                                
+                                
+                                achievements.resetAll()
                             }
                         }
                     }
@@ -1323,7 +1349,6 @@ struct ContentView: View {
         //let desired = "Tails"
         #endif
 
-        //achievements.resetAll()
         
         // Capture state
         baseFaceAtLaunch = curState
@@ -1403,6 +1428,7 @@ struct ContentView: View {
                     }
                     // sfx
                     SoundManager.shared.play("trophy_unlock")
+                    Haptics.shared.success()
                 }
  
                 currentFlipWasSuper = false
@@ -1431,6 +1457,7 @@ struct ContentView: View {
                                     }
                                 }
                                 SoundManager.shared.play("trophy_unlock")
+                                Haptics.shared.success()
                             }
                         }
                     }

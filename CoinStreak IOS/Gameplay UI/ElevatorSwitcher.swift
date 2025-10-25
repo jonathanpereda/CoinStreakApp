@@ -166,12 +166,12 @@ struct ElevatorSwitcher<Below: View, Mid: View, Above: View>: View {
                     showAbove = false
                     doorsHidden = false
                     SoundManager.shared.play("scrape_1")
+                    Haptics.shared.scrapeOpen()
                     withAnimation(openAnim) { doorsOpen = true }
                     DispatchQueue.main.asyncAfter(deadline: .now() + openDur) {
                         doorsHidden = true
                         onDoorImpact?(Date())
                         onOpenEnded?()
-                        //SoundManager.shared.play("thud_1")
                     }
                 } else if !fromStarter && toStarter {
                     // CLOSE: keep streak BELOW while doors shut over it...
@@ -179,14 +179,16 @@ struct ElevatorSwitcher<Below: View, Mid: View, Above: View>: View {
                     showAbove = false
                     doorsHidden = false
                     SoundManager.shared.play("scrape_1")
+                    Haptics.shared.scrapeClose()
                     withAnimation(closeAnim) { doorsOpen = false }
                     DispatchQueue.main.asyncAfter(deadline: .now() + closeDur) {
                         displayedBackwall = newName
                         showAbove = true
                         showBelow = false
                         onDoorImpact?(Date())
-                        onCloseEnded?()                    // ← NEW
+                        onCloseEnded?()
                         SoundManager.shared.play("thud_1")
+                        Haptics.shared.thud()
                     }
                 } else {
                     // Fallback for unexpected changes

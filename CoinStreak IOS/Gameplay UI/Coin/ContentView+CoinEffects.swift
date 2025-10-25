@@ -51,6 +51,7 @@ extension ContentView {
         let now = Date()
         gameplayDustTrigger = now
         SoundManager.shared.play("thud_1")
+        Haptics.shared.thud()
 
         // auto-remove after the puff (match DustPuff’s 0.48s + tiny buffer)
         let lifetime = 0.48 + 0.05

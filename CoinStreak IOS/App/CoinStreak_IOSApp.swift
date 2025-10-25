@@ -17,14 +17,15 @@ struct CoinStreak_IOSApp: App {
     
     init() {
         
-        #if DEBUG
+        /*#if DEBUG
         if !Self.didStageThisLaunch {
             Self.didStageThisLaunch = true
             // Pick a scenario to simulate (0=Starter, 1=Lab, 2=next, etc.)
             ProgressionManager.debugStagePreUpdateState(pretendTileVisited: 2)
         }
-        #endif
+        #endif*/
         
+        Haptics.shared.prepare()
         registerAllBundleFonts()
         _ = InstallIdentity.getOrCreateInstallId()
         // No auto-retire on fresh install anymore.

@@ -111,6 +111,7 @@ struct IntroOverlay: View {
                 
                 SoundManager.shared.play("thud_1")
                 onThud(Date())
+                Haptics.shared.thud()
                 
                 withTransaction(tx) { dropGroupOpacity = 0 }   // hide overlay coin+shadow instantly
                 withTransaction(tx) { onRevealGameplay() }     // show gameplay coin under overlay

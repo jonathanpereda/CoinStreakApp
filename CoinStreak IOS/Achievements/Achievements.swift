@@ -25,7 +25,7 @@ enum AchievementsCatalog {
         ),
         .init(
             id: .unlucky,
-            name: "Unlucky",
+            name: "Tough Luck",
             shortBlurb: "Lose 10 times in a row",
             thumbName: "trophy_unlucky_thumb", // export a simple PNG; placeholder ok
             silhouetteName: "trophy_unlucky_sil"
