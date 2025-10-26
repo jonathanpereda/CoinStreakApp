@@ -185,13 +185,15 @@ struct SlidingScoreboardPanel: View {
             .animation(anim, value: isOpen)
         }
         .frame(width: panelWidth + tabWidth, height: panelHeight)
-        .onAppear {
+        /*.onAppear {
             vm.startPolling()        // <- start the 5s loop again
         }
         .task {
             await vm.refresh()       // <- do an immediate fetch so it updates right away
-        }
+        }*/
+        
     }
+    
 }
 
 struct NumericMorph: ViewModifier {

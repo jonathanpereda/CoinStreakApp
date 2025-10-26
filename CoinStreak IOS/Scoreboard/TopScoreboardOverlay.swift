@@ -17,7 +17,9 @@ struct TopScoreboardOverlay: View {
     @Binding var isLeaderboardOpen: Bool
 
     @State private var rememberedLeaderboardOpen: Bool = false
-
+    //@StateObject private var leaderboardVM = LeaderboardVM()
+    @StateObject private var nameVM = NameEntryVM()
+    
     // subtle framing tweaks
     private let bleedX: CGFloat    = 0.8       // tiny left/right bleed
     private let topBleedY: CGFloat = 0.8       // small upward nudge
@@ -81,7 +83,45 @@ struct TopScoreboardOverlay: View {
                         .offset(x: -bleedX, y: lbY)
                         .allowsHitTesting(false)
                         .zIndex(0)
+                    
+                    let boxOriginPx = CGPoint(x: 556, y: 720)    // top-left of the baked input box INSIDE leaderboard art
+                    let boxSizePx   = CGSize(width: 397, height: 48)
+
+                    // Scale to points (same 's' used above)
+                    let boxW = boxSizePx.width * s
+                    let boxH = boxSizePx.height * s
+
+                    // Convert design-px origin → on-screen position:
+                    // - The leaderboard's left/top on screen is (-bleedX, lbY)
+                    // - Then add your design-pixel offset (scaled by 's')
+                    let posX = (-bleedX) + boxOriginPx.x * s + boxW/2
+                    let posY = lbY       + boxOriginPx.y * s + boxH/2
+
+                    // Debug-on version so you can see it
+                    NameEntryBar(vm: nameVM,           // <-- make sure nameVM is in scope here (StateObject up in this view)
+                                  boxSize: .init(width: boxW, height: boxH),
+                                  showDebug: false)      
+                    .position(x: posX, y: posY)
+                    .zIndex(20_000)
+                    .allowsHitTesting(true)
+                    
+                    Text("Tap name to report")
+                        .font(.system(size: 8, weight: .semibold))
+                        .position(x: posX + 115, y: posY+5)
+                        .foregroundStyle(.red.opacity(0.5))
                 }
+                if isLeaderboardOpen {
+                    LeaderboardContent(
+                        heads: vm.headsTop,
+                        tails: vm.tailsTop,
+                        streakColor: streakColor
+                    )
+                    .frame(width: geo.size.width)
+                    .offset(x: -bleedX, y: lbY + 64)
+                    .zIndex(20_000)
+                    .allowsHitTesting(true)
+                }
+
 
                 // ---- SCORE MENU visuals (no hit-testing) ----
                 ZStack(alignment: .topLeading) {
@@ -238,8 +278,151 @@ struct TopScoreboardOverlay: View {
                     isLeaderboardOpen = false
                 }
             }
+            .onChange(of: isLeaderboardOpen) { _, open in
+                if open {
+                    Task {
+                        await nameVM.loadProfile()
+                        await vm.refresh(includeLeaderboard: true)
+                    }
+                }
+            }
+            
         }
         .transition(.opacity)
         .zIndex(999)
+    }
+}
+
+// MARK: LEADERBOARD CONTENT
+
+private struct LeaderboardContent: View {
+    let heads: [LeaderboardEntryDTO]
+    let tails: [LeaderboardEntryDTO]
+    let streakColor: (Int) -> Color
+    
+    @State private var reportTarget: LeaderboardEntryDTO? = nil
+    @State private var showReportConfirm: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 20) {
+                column(entries: heads, side: "H")
+                column(entries: tails, side: "T")
+            }
+            .padding(.top, 24)
+            .padding(.horizontal, 24)
+
+            Spacer(minLength: 20)
+        }
+        .foregroundColor(.white)
+        .allowsHitTesting(true)
+    }
+
+    @ViewBuilder
+    private func column(entries: [LeaderboardEntryDTO], side: String) -> some View {
+        // Tune these once to fit your art
+        let rankW: CGFloat   = 30
+        let nameW: CGFloat   = 112   // widen a bit so names don’t force clipping
+        let streakW: CGFloat = 36
+        let gap: CGFloat     = 2
+
+        VStack(alignment: .leading, spacing: 6) {
+            if entries.isEmpty {
+                Text("—").opacity(0.5)
+            } else {
+                ForEach(Array(entries.enumerated()), id: \.element.installId) { idx, e in
+                    HStack(alignment: .firstTextBaseline, spacing: gap) {
+
+                        if side == "T" {
+                            // Right column (Tails): STREAK → NAME → RANK
+                            Text("\(e.currentStreak)")
+                                .font(.system(size: 14, weight: .heavy))
+                                .monospacedDigit()
+                                .foregroundColor(streakColor(e.currentStreak))
+                                .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                                .frame(width: streakW, alignment: .trailing)
+
+                            Button {
+                                reportTarget = e
+                                showReportConfirm = true
+                            } label: {
+                                Text(e.displayName)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                    .opacity(0.92)
+                                    .frame(width: nameW, alignment: .trailing)
+                                    .contentShape(Rectangle())
+                                    //.background(Color.red.opacity(0.5))
+                            }
+                            .buttonStyle(.plain)
+
+
+                            Text("[\(idx + 1)]")
+                                .font(.system(size: 14, weight: .bold))
+                                .monospacedDigit()
+                                .opacity(0.75)
+                                .frame(width: rankW, alignment: .trailing)
+
+                        } else {
+                            // Left column (Heads): RANK → NAME → STREAK
+                            Text("[\(idx + 1)]")
+                                .font(.system(size: 14, weight: .bold))
+                                .monospacedDigit()
+                                .opacity(0.75)
+                                .frame(width: rankW, alignment: .leading)
+
+                            Button {
+                                reportTarget = e
+                                showReportConfirm = true
+                            } label: {
+                                Text(e.displayName)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                    .opacity(0.92)
+                                    .frame(width: nameW, alignment: .leading)
+                                    .contentShape(Rectangle())
+                                    //.background(Color.red.opacity(0.5))
+                            }
+                            .buttonStyle(.plain)
+
+                            Text("\(e.currentStreak)")
+                                .font(.system(size: 14, weight: .heavy))
+                                .monospacedDigit()
+                                .foregroundColor(streakColor(e.currentStreak))
+                                .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                                .frame(width: streakW, alignment: .leading)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .alert("Report this name?", isPresented: $showReportConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Report", role: .destructive) {
+                guard let t = reportTarget else { return }
+                let reporter = InstallIdentity.getOrCreateInstallId()
+                // fire-and-forget; dismiss the alert immediately
+                Task {
+                    _ = await ScoreboardAPI.reportName(
+                        reporterInstallId: reporter,
+                        targetInstallId: t.installId,
+                        reason: "inappropriate-username",
+                        details: "Reported from leaderboard tap"
+                    )
+                }
+                showReportConfirm = false
+            }
+        } message: {
+            if let t = reportTarget {
+                Text("“\(t.displayName)”")
+            } else {
+                Text("")
+            }
+        }
+
     }
 }

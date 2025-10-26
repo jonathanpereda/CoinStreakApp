@@ -288,187 +288,9 @@ struct ContentView: View {
                     .zIndex(50)                // keep above table/gameplay
                     .transition(.opacity)
                     
-                    // MARK: BOTTOM MENU BUTTONS
                     
                     .overlay(alignment: .bottomLeading) {
-                        ZStack(alignment: .leading) {
-
-                            var anyBottomSheetOpen: Bool {
-                                isMapSelectOpen || isSettingsOpen || isTrophiesOpen
-                            }
-                            
-                            // === Buttons row (Map + Settings + Scoreboard) ===
-                            HStack(spacing: 8) {
-                                // MAP button
-                                Button {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
-                                        if isSettingsOpen {
-                                            isSettingsOpen = false           // close Settings if open
-                                        } else if isTrophiesOpen {
-                                            isTrophiesOpen = false           // close Trophies if open
-                                        } else {
-                                            isMapSelectOpen.toggle()
-                                        }
-                                    }
-                                } label: {
-                                    SquareHUDButton(
-                                        isOutlined: showNewMapToast,
-                                        outlineColor: Color(red: 0.35, green: 0.4, blue: 1.0)
-                                    ) {
-                                        Image(systemName: anyBottomSheetOpen ? "xmark" : "map.fill")
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(width: 22, height: 22)
-                                            .foregroundColor(.white.opacity(0.6))
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                                
-                                // TROPHIES button
-                                Button {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
-                                        if isMapSelectOpen { isMapSelectOpen = false }
-                                        if isSettingsOpen { isSettingsOpen = false }
-                                        isTrophiesOpen.toggle()
-                                    }
-                                } label: {
-                                    SquareHUDButton(
-                                        isOutlined: showNewTrophyToast,
-                                        outlineColor: Color(red: 1.0, green: 0.8, blue: 0.2)
-                                    ) {
-                                        Image(systemName: "trophy.fill")
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(width: 22, height: 22)
-                                            .foregroundColor(.white.opacity(0.6))
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
-                                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
-                                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
-                                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
-                                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
-
-
-                                
-                                // SETTINGS button
-                                Button {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
-                                        if isMapSelectOpen { isMapSelectOpen = false }   // opening settings closes map
-                                        isSettingsOpen.toggle()
-                                    }
-                                } label: {
-                                    SquareHUDButton(isOutlined: false) {
-                                        Image(systemName: "gearshape.fill")
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(width: 22, height: 22)
-                                            .foregroundColor(.white.opacity(0.6))
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
-                                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
-                                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
-                                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
-                                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
-
-
-
-                                // SCOREBOARD menu button
-                                Button {
-                                    withAnimation(.easeInOut(duration: 0.22)) {
-                                        if isScoreMenuOpen {
-                                            isLeaderboardOpen = false
-                                            isScoreMenuOpen = false
-                                        } else {
-                                            isScoreMenuOpen = true
-                                        }
-                                    }
-                                } label: {
-                                    SquareHUDButton(isOutlined: isScoreMenuOpen) {
-                                        Image("scoreboard_menu_icon")
-                                            .resizable()
-                                            .interpolation(.high)
-                                            .scaledToFit()
-                                            .frame(width: 22, height: 22)
-                                            .opacity(0.8)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
-                                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
-                                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
-                                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
-                                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
-
-                            }
-
-                            // === Toast layer ===
-                            if !anyBottomSheetOpen && showNewMapToast {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(red: 0.15, green: 0.55, blue: 1.0, opacity: 0.95),
-                                                Color(red: 0.50, green: 0.20, blue: 1.0, opacity: 0.95)
-                                            ],
-                                            startPoint: .leading, endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(width: 160, height: 24, alignment: .leading)
-                                    .overlay(
-                                        Text("New map unlocked")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 12),
-                                        alignment: .leading
-                                    )
-                                    .padding(.leading, 0)
-                                    .offset(y: -31)
-                                    .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-                                    .transition(.opacity)
-                                    .animation(.easeInOut(duration: 0.5), value: showNewMapToast)
-                                    .allowsHitTesting(false) // taps pass through to buttons underneath
-                                    .zIndex(999)            // <<< ensures it sits above ANY buttons to the right
-                            }
-                            
-                            // === Trophy toast ===
-                            if !anyBottomSheetOpen && showNewTrophyToast {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(red: 0.95, green: 0.78, blue: 0.10, opacity: 0.96),
-                                                Color(red: 1.00, green: 0.55, blue: 0.18, opacity: 0.96)
-                                            ],
-                                            startPoint: .leading, endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(width: 170, height: 24, alignment: .leading)
-                                    .overlay(
-                                        Text("New trophy unlocked")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundColor(.black.opacity(0.85))
-                                            .padding(.horizontal, 12),
-                                        alignment: .leading
-                                    )
-                                    .padding(.leading, 45)
-                                    .offset(y: -31)
-                                    .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-                                    .transition(.opacity)
-                                    .animation(.easeInOut(duration: 0.5), value: showNewTrophyToast)
-                                    .allowsHitTesting(false)
-                                    .zIndex(999)
-                            }
-
-                            
-                        }
-                        .padding(.leading, 24)
-                        .padding(.bottom, 30)
-                        .opacity(phase != .choosing ? 1 : 0)
-                        .animation(.easeInOut(duration: 0.2), value: phase)
+                        bottomMenuOverlay(geo)
                     }
 
 
@@ -974,7 +796,7 @@ struct ContentView: View {
                                 scoreboardVM.isOnline = true
 
                                 // 5) Resume polling (or let onAppear do it)
-                                scoreboardVM.startPolling()
+                                scoreboardVM.startPolling(includeLeaderboard: { isLeaderboardOpen })
                                 
                                 
                                 achievements.resetAll()
@@ -1009,64 +831,8 @@ struct ContentView: View {
                 .padding(.leading, 8)
             }
             #endif
-
             
-            // MARK: CHOOSE SCREEN OVERLAY
-            
-            .overlay {
-                if phase == .choosing {
-                    ChooseFaceScreen(
-                        store: store,
-                        groundY: groundY,
-                        screenSize: geo.size
-                    ) { selected in
-                            // 1) Lock side in Keychain (survives reinstall)
-                            InstallIdentity.setLockedSide(selected == .Heads ? "H" : "T")
-
-                            // 2) Persist selection locally & enter gameplay
-                            store.chosenFace = selected
-                            curState         = selected.rawValue
-                            baseFaceAtLaunch = selected.rawValue
-                            gameplayOpacity  = 1
-                            phase            = .playing
-
-                            // 3) Backend + sync
-                            let installId = InstallIdentity.getOrCreateInstallId()
-                            Task {
-                                // idempotent: safe if already registered
-                                await ScoreboardAPI.register(installId: installId, side: selected)
-
-                                // ensure server has your current streak (first-time add)
-                                await ScoreboardAPI.bootstrap(
-                                    installId: installId,
-                                    side: selected,
-                                    currentStreak: store.currentStreak
-                                )
-
-                                // seed offline replay baseline, then refresh UI totals
-                                StreakSync.shared.seedAcked(to: store.currentStreak)
-                                await scoreboardVM.refresh()   // remove if not in scope here
-                            }
-                        
-
-                        // Reset gameplay coin transforms just in case
-                        y = 0; scale = 1
-                        flightAngle = 0; flightTarget = 0
-
-                        // HIDE gameplay coin immediately (no animation) so it won't show before the drop
-                        withTransaction(Transaction(animation: nil)) { gameplayOpacity = 0 }
-
-                        // Start pre-roll
-                        withAnimation(.easeInOut(duration: 0.35)) {
-                            phase = .preRoll
-                        }
-                    }
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-                    .zIndex(1000)
-                }
-            }
+            .overlay { chooseOverlay(geo, groundY: groundY) }
 
             
             // MARK: HERO DROP OVERLAY
@@ -1106,6 +872,8 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 }
             }
+            
+            
             // Top score window that fades in at the very top (ignores safe area)
             .overlay(alignment: .topLeading) {
                 TopScoreboardOverlay(
@@ -1252,27 +1020,28 @@ struct ContentView: View {
 
             lastTierName = newName
         }
-        .onChange(of: scenePhase) { _, newPhase in
+        .onChange(of: scenePhase) {_, newPhase in
             switch newPhase {
             case .active:
-                scoreboardVM.startPolling()
-                Task { await scoreboardVM.refresh() } // optional immediate refresh
-                if scoreboardVM.isOnline {
-                    let id = InstallIdentity.getOrCreateInstallId()
-                    StreakSync.shared.replayIfNeeded(installId: id)
-                }
+                // Refresh every 5s; includes leaderboard only when it's open
+                scoreboardVM.startPolling(includeLeaderboard: { isLeaderboardOpen })
+                // (Optional) immediate kick so LB shows right away if open
+                Task { await scoreboardVM.refresh(includeLeaderboard: isLeaderboardOpen) }
             case .inactive, .background:
                 scoreboardVM.stopPolling()
             @unknown default: break
+            }
+        }
+        .onChange(of: isLeaderboardOpen) {_, open in
+            if open {
+                Task { await scoreboardVM.refresh(includeLeaderboard: true) }
             }
         }
         .onAppear {
             lastUnlockedCount = progression.unlockedCount
         }
         .onChange(of: progression.unlockedCount) { old, new in
-            if new > old && !isMapSelectOpen {
-                triggerNewMapToast()
-            }
+            if new > old && !isMapSelectOpen { triggerNewMapToast() }
             lastUnlockedCount = new
         }
         
@@ -1584,11 +1353,242 @@ struct ContentView: View {
         }
     }
 
+}
 
+// MARK: BOTTOM MENU BUTTONS
+
+private extension ContentView {
+    @ViewBuilder
+    func bottomMenuOverlay(_ geo: GeometryProxy) -> some View {
+        ZStack(alignment: .leading) {
+
+            var anyBottomSheetOpen: Bool {
+                isMapSelectOpen || isSettingsOpen || isTrophiesOpen
+            }
+
+            // === Buttons row (Map + Settings + Scoreboard) ===
+            HStack(spacing: 8) {
+                // MAP button
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                        if isSettingsOpen { isSettingsOpen = false }
+                        else if isTrophiesOpen { isTrophiesOpen = false }
+                        else { isMapSelectOpen.toggle() }
+                    }
+                } label: {
+                    SquareHUDButton(
+                        isOutlined: showNewMapToast,
+                        outlineColor: Color(red: 0.35, green: 0.4, blue: 1.0)
+                    ) {
+                        Image(systemName: anyBottomSheetOpen ? "xmark" : "map.fill")
+                            .resizable().scaledToFit()
+                            .frame(width: 22, height: 22)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+                .buttonStyle(.plain)
+
+                // TROPHIES button
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                        if isMapSelectOpen { isMapSelectOpen = false }
+                        if isSettingsOpen { isSettingsOpen = false }
+                        isTrophiesOpen.toggle()
+                    }
+                } label: {
+                    SquareHUDButton(
+                        isOutlined: showNewTrophyToast,
+                        outlineColor: Color(red: 1.0, green: 0.8, blue: 0.2)
+                    ) {
+                        Image(systemName: "trophy.fill")
+                            .resizable().scaledToFit()
+                            .frame(width: 22, height: 22)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+                .buttonStyle(.plain)
+                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
+                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
+                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
+                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+
+                // SETTINGS button
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                        if isMapSelectOpen { isMapSelectOpen = false }
+                        isSettingsOpen.toggle()
+                    }
+                } label: {
+                    SquareHUDButton(isOutlined: false) {
+                        Image(systemName: "gearshape.fill")
+                            .resizable().scaledToFit()
+                            .frame(width: 22, height: 22)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+                .buttonStyle(.plain)
+                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
+                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
+                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
+                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+
+                // SCOREBOARD menu button
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        if isScoreMenuOpen {
+                            isLeaderboardOpen = false
+                            isScoreMenuOpen = false
+                        } else {
+                            isScoreMenuOpen = true
+                        }
+                    }
+                } label: {
+                    SquareHUDButton(isOutlined: isScoreMenuOpen) {
+                        Image("scoreboard_menu_icon")
+                            .resizable()
+                            .interpolation(.high)
+                            .scaledToFit()
+                            .frame(width: 22, height: 22)
+                            .opacity(0.8)
+                        }
+                }
+                .buttonStyle(.plain)
+                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
+                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
+                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
+                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+            }
+
+            // === Map toast ===
+            if !anyBottomSheetOpen && showNewMapToast {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.15, green: 0.55, blue: 1.0, opacity: 0.95),
+                                Color(red: 0.50, green: 0.20, blue: 1.0, opacity: 0.95)
+                            ],
+                            startPoint: .leading, endPoint: .trailing
+                        )
+                    )
+                    .frame(width: 160, height: 24, alignment: .leading)
+                    .overlay(
+                        Text("New map unlocked")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12),
+                        alignment: .leading
+                    )
+                    .padding(.leading, 0)
+                    .offset(y: -31)
+                    .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.5), value: showNewMapToast)
+                    .allowsHitTesting(false)
+                    .zIndex(999)
+            }
+
+            // === Trophy toast ===
+            if !anyBottomSheetOpen && showNewTrophyToast {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.95, green: 0.78, blue: 0.10, opacity: 0.96),
+                                Color(red: 1.00, green: 0.55, blue: 0.18, opacity: 0.96)
+                            ],
+                            startPoint: .leading, endPoint: .trailing
+                        )
+                    )
+                    .frame(width: 170, height: 24, alignment: .leading)
+                    .overlay(
+                        Text("New trophy unlocked")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.black.opacity(0.85))
+                            .padding(.horizontal, 12),
+                        alignment: .leading
+                    )
+                    .padding(.leading, 45)
+                    .offset(y: -31)
+                    .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.5), value: showNewTrophyToast)
+                    .allowsHitTesting(false)
+                    .zIndex(999)
+            }
+        }
+        .padding(.leading, 24)
+        .padding(.bottom, 30)
+        .opacity(phase != .choosing ? 1 : 0)
+        .animation(.easeInOut(duration: 0.2), value: phase)
+    }
 }
 
 
-#Preview { ContentView() }
+// MARK: CHOOSE SCREEN OVERLAY
+
+private extension ContentView {
+    @ViewBuilder
+    func chooseOverlay(_ geo: GeometryProxy, groundY: CGFloat) -> some View {
+        if phase == .choosing {
+            ChooseFaceScreen(
+                store: store,
+                groundY: groundY,
+                screenSize: geo.size
+            ) { selected in
+                    // 1) Lock side in Keychain (survives reinstall)
+                    InstallIdentity.setLockedSide(selected == .Heads ? "H" : "T")
+
+                    // 2) Persist selection locally & enter gameplay
+                    store.chosenFace = selected
+                    curState         = selected.rawValue
+                    baseFaceAtLaunch = selected.rawValue
+                    gameplayOpacity  = 1
+                    phase            = .playing
+
+                    // 3) Backend + sync
+                    let installId = InstallIdentity.getOrCreateInstallId()
+                    Task {
+                        // idempotent: safe if already registered
+                        await ScoreboardAPI.register(installId: installId, side: selected)
+
+                        // ensure server has your current streak (first-time add)
+                        await ScoreboardAPI.bootstrap(
+                            installId: installId,
+                            side: selected,
+                            currentStreak: store.currentStreak
+                        )
+
+                        // seed offline replay baseline, then refresh UI totals
+                        StreakSync.shared.seedAcked(to: store.currentStreak)
+                        await scoreboardVM.refresh(includeLeaderboard: isLeaderboardOpen)
+                    }
+                
+
+                // Reset gameplay coin transforms just in case
+                y = 0; scale = 1
+                flightAngle = 0; flightTarget = 0
+
+                // HIDE gameplay coin immediately (no animation) so it won't show before the drop
+                withTransaction(Transaction(animation: nil)) { gameplayOpacity = 0 }
+
+                // Start pre-roll
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    phase = .preRoll
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .ignoresSafeArea()
+            .transition(.opacity)
+            .zIndex(1000)
+        }
+    }
+}
+
+
 
 
 
