@@ -741,6 +741,7 @@ struct ContentView: View {
 
             }
             .ignoresSafeArea()
+            .ignoresSafeArea(.keyboard)
 
 
             // MARK: DEBUG BUTTONS
@@ -883,6 +884,7 @@ struct ContentView: View {
                 )
                 .opacity(store.chosenFace != nil ? 1 : 0) // only after a side is chosen
                 .ignoresSafeArea(edges: .top)             // sit flush against the top curves
+                .ignoresSafeArea(.keyboard)
             }
 
 
@@ -1046,6 +1048,7 @@ struct ContentView: View {
         }
         
         .statusBarHidden(true)
+        .ignoresSafeArea(.keyboard)   
 
     }
     
