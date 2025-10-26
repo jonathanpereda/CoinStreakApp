@@ -566,7 +566,8 @@ struct ContentView: View {
                                         TrophyCell(
                                             achievement: ach,
                                             isUnlocked: unlocked,
-                                            isActive: activeTooltip == ach.id
+                                            isActive: activeTooltip == ach.id,
+                                            isHighlighted: achievements.isUnseen(ach.id)
                                         ) {
                                             // toggle the inline tooltip
                                             if activeTooltip == ach.id {
@@ -1046,9 +1047,15 @@ struct ContentView: View {
             if new > old && !isMapSelectOpen { triggerNewMapToast() }
             lastUnlockedCount = new
         }
+        .onChange(of: isTrophiesOpen) { _, open in
+            // When the player closes the trophies panel, consider all newly-unlocked trophies "seen"
+            if !open {
+                achievements.markAllSeen()
+            }
+        }
         
         .statusBarHidden(true)
-        .ignoresSafeArea(.keyboard)   
+        .ignoresSafeArea(.keyboard)
 
     }
     
@@ -1120,6 +1127,10 @@ struct ContentView: View {
         let desired = Bool.random() ? "Heads" : "Tails"
         //let desired = "Tails"
         #endif
+        
+        
+        //DEBUG USE ONLY
+        //achievements.resetAll()
 
         
         // Capture state

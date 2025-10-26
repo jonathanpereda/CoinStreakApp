@@ -4,6 +4,7 @@ struct TrophyCell: View {
     let achievement: Achievement
     let isUnlocked: Bool
     let isActive: Bool          // true = show description
+    let isHighlighted: Bool
     let onTap: () -> Void
     private let size: CGFloat = 90
 
@@ -12,7 +13,6 @@ struct TrophyCell: View {
             RoundedRectangle(cornerRadius: 14)
                 .fill(.white.opacity(0.10))
 
-            // Normal content (icon + label)
             VStack(spacing: 6) {
                 ZStack {
                     if isUnlocked {
@@ -59,6 +59,13 @@ struct TrophyCell: View {
                 .allowsHitTesting(false)
         }
         .frame(width: size, height: size)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color(red: 1.0, green: 0.85, blue: 0.25).opacity((isUnlocked && isHighlighted) ? 0.95 : 0.0),
+                        lineWidth: (isUnlocked && isHighlighted) ? 2 : 0)
+                .shadow(color: Color(red: 1.0, green: 0.85, blue: 0.25).opacity((isUnlocked && isHighlighted) ? 0.7 : 0.0),
+                        radius: (isUnlocked && isHighlighted) ? 5 : 0)
+        )
         .shadow(color: .black.opacity(0.35), radius: 5, x: 0, y: 3)
         .contentShape(Rectangle())
         .onTapGesture {
@@ -67,5 +74,6 @@ struct TrophyCell: View {
         }
         // smooth crossfade both ways
         .animation(.easeInOut(duration: 0.18), value: isActive)
+        .animation(.easeInOut(duration: 0.18), value: isHighlighted)
     }
 }
