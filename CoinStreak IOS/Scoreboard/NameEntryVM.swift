@@ -126,19 +126,27 @@ final class NameEntryVM: ObservableObject {
 
     // MARK: - Timer / cooldown helpers
 
+    // 1) All UI/state mutations live here on the main actor.
+    @MainActor
+    private func tickCooldown() {
+        cooldownRemaining = max(0, cooldownRemaining - 1)
+        if cooldownRemaining <= 0 {
+            canChange = true
+            timer?.invalidate()
+            timer = nil
+        }
+    }
+
     private func startTimerIfNeeded() {
         timer?.invalidate()
         guard cooldownRemaining > 0 else { return }
 
+        // 2) Timer closure is not main-actor isolated → hop with Task to call the @MainActor func.
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
-            cooldownRemaining = max(0, cooldownRemaining - 1)
-            if cooldownRemaining <= 0 {
-                canChange = true
-                timer?.invalidate()
-                timer = nil
-            }
+            Task { await self.tickCooldown() }
         }
+
         t.tolerance = 0.25
         RunLoop.main.add(t, forMode: .common)
         timer = t

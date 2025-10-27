@@ -8,6 +8,7 @@
 import SwiftUI
 import Foundation
 import UIKit
+import Combine
 
 ///MISC
 
@@ -47,6 +48,12 @@ struct ContentView: View {
     @State private var tooltipHideWorkItem: DispatchWorkItem?
     @AppStorage("ach.progress.unlucky_wrong10")
     private var unluckyWrong10: Int = 0
+    @AppStorage("ach.progress.alt_count") private var alternatingCount: Int = 0
+    @AppStorage("ach.progress.alt_last_raw")
+    private var alternatingLastRaw: String = ""
+    @AppStorage("ach.progress.total_flips") private var totalFlips: Int = 0
+
+
     
     // Map menu stuff
     @Environment(\.scenePhase) private var scenePhase
@@ -1057,6 +1064,16 @@ struct ContentView: View {
                 achievements.markAllSeen()
             }
         }
+        .onReceive(scoreboardVM.$headsTop) { _ in
+            checkLeaderboardMedals()
+        }
+        .onReceive(scoreboardVM.$tailsTop) { _ in
+            checkLeaderboardMedals()
+        }
+        .onChange(of: isLeaderboardOpen) { _, open in
+            if open { checkLeaderboardMedals() }
+        }
+        
         
         // MARK: UPDATE PROMPT
         
@@ -1144,6 +1161,53 @@ struct ContentView: View {
             showNewMapToast = false
         }
     }
+    
+    // MARK: Leaderboard Medals
+    
+    private func checkLeaderboardMedals() {
+        guard isLeaderboardOpen, let mySide = store.chosenFace else { return }
+        let myId = InstallIdentity.getOrCreateInstallId()
+
+        // Pick the correct column for the user’s side
+        let slice: [LeaderboardEntryDTO] = (mySide == .Heads) ? scoreboardVM.headsTop : scoreboardVM.tailsTop
+
+        // Find my rank (top-5 only)
+        guard let idx = slice.firstIndex(where: { $0.installId == myId }) else { return }
+        let rank = idx + 1
+
+        switch rank {
+        case 1:
+            if achievements.unlock(.gold) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) { showNewTrophyToast = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) { showNewTrophyToast = false }
+                }
+                SoundManager.shared.play("trophy_unlock")
+                Haptics.shared.success()
+            }
+        case 2:
+            if achievements.unlock(.silver) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) { showNewTrophyToast = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) { showNewTrophyToast = false }
+                }
+                SoundManager.shared.play("trophy_unlock")
+                Haptics.shared.success()
+            }
+        case 3:
+            if achievements.unlock(.bronze) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) { showNewTrophyToast = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) { showNewTrophyToast = false }
+                }
+                SoundManager.shared.play("trophy_unlock")
+                Haptics.shared.success()
+            }
+        default:
+            break   // ranks 4–5 (or not present) do nothing
+        }
+    }
+
 
     
 
@@ -1172,6 +1236,7 @@ struct ContentView: View {
         let desired = (Int.random(in: 0..<3) < 2) ? "Heads" : "Tails"
         #else
         let desired = Bool.random() ? "Heads" : "Tails"
+        //let desired = "Heads"
         //let desired = "Tails"
         #endif
         
@@ -1292,6 +1357,120 @@ struct ContentView: View {
                         }
                     }
                 }
+                
+                // === STEADY / DEDICATED / DEVOTED ===
+                totalFlips &+= 1
+
+                if totalFlips >= 35000 && !achievements.isUnlocked(.devoted) {
+                    if achievements.unlock(.devoted) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                            showNewTrophyToast = true
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                                showNewTrophyToast = false
+                            }
+                        }
+                        SoundManager.shared.play("trophy_unlock")
+                        Haptics.shared.success()
+                    }
+                } else if totalFlips >= 10000 && !achievements.isUnlocked(.dedicated) {
+                    if achievements.unlock(.dedicated) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                            showNewTrophyToast = true
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                                showNewTrophyToast = false
+                            }
+                        }
+                        SoundManager.shared.play("trophy_unlock")
+                        Haptics.shared.success()
+                    }
+                } else if totalFlips >= 1000 && !achievements.isUnlocked(.steady) {
+                    if achievements.unlock(.steady) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                            showNewTrophyToast = true
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                                showNewTrophyToast = false
+                            }
+                        }
+                        SoundManager.shared.play("trophy_unlock")
+                        Haptics.shared.success()
+                    }
+                }
+                
+                // === NIGHT OWL (flip between 12–4 AM local time) ===
+                if !achievements.isUnlocked(.nightowl) {
+                    let hour = Calendar.current.component(.hour, from: Date())
+                    if (0...3).contains(hour) {    // 0,1,2 = 12AM–3:59AM
+                        if achievements.unlock(.nightowl) {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                                showNewTrophyToast = true
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                                    showNewTrophyToast = false
+                                }
+                            }
+                            SoundManager.shared.play("trophy_unlock")
+                            Haptics.shared.success()
+                        }
+                    }
+                }
+
+
+                
+                // === BALANCED / HARMONY: alternation tracker (H–T–H–T…) ===
+                // Only do work if Harmony isn't already unlocked (Balanced may still unlock at 10 on the way)
+                if !achievements.isUnlocked(.harmony) {
+                    let prev = (alternatingLastRaw.isEmpty ? nil : alternatingLastRaw)
+                    if let prev {
+                        if prev != desired {
+                            alternatingCount &+= 1
+                        } else {
+                            alternatingCount = 1
+                        }
+                    } else {
+                        alternatingCount = 1
+                    }
+                    alternatingLastRaw = desired
+
+                    // Unlocks (keep counting up so 10 → 15 works in one run)
+                    if alternatingCount >= 15 {
+                        // Hit Harmony
+                        alternatingCount = 0 // clear so it can't spam
+                        if achievements.unlock(.harmony) {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                                showNewTrophyToast = true
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                                    showNewTrophyToast = false
+                                }
+                            }
+                            SoundManager.shared.play("trophy_unlock")
+                            Haptics.shared.success()
+                        }
+                    } else if alternatingCount >= 10 && !achievements.isUnlocked(._balanced) {
+                        // Hit Balanced (only once)
+                        if achievements.unlock(._balanced) {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                                showNewTrophyToast = true
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                                    showNewTrophyToast = false
+                                }
+                            }
+                            SoundManager.shared.play("trophy_unlock")
+                            Haptics.shared.success()
+                        }
+                    }
+                }
+
            
                 store.recordFlip(result: faceVal)
                 let installId = InstallIdentity.getOrCreateInstallId()

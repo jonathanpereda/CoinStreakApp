@@ -400,7 +400,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"CoinStreak IOS/Preview Content\"";
 				DEVELOPMENT_TEAM = JL27N9Z2S7;
 				ENABLE_PREVIEWS = YES;
@@ -417,7 +417,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.1;
 				"OTHER_SWIFT_FLAGS[arch=*]" = "-D TRAILER_RESET";
 				PRODUCT_BUNDLE_IDENTIFIER = "HorizonRidge.CoinStreak-IOS.Trailer";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -597,7 +597,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"CoinStreak IOS/Preview Content\"";
 				DEVELOPMENT_TEAM = JL27N9Z2S7;
 				ENABLE_PREVIEWS = YES;
@@ -614,7 +614,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "HorizonRidge.CoinStreak-IOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -635,7 +635,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"CoinStreak IOS/Preview Content\"";
 				DEVELOPMENT_TEAM = JL27N9Z2S7;
 				ENABLE_PREVIEWS = YES;
@@ -652,7 +652,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.horizonridge.coinstreak;
 				PRODUCT_NAME = "Flip Streak";
 				SDKROOT = iphoneos;
