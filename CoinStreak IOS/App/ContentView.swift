@@ -109,6 +109,10 @@ struct ContentView: View {
     @State private var musicMutedUI = SoundManager.shared.isMusicMuted
     @State private var hapticsEnabledUI = Haptics.shared.isEnabled
     @AppStorage("disableTapFlip") private var disableTapFlip = false
+    
+    //Update Prompt
+    @State private var showUpdateSheet = false
+    @State private var storeVersionToPrompt: String? = nil
 
 
     @ViewBuilder
@@ -1054,6 +1058,49 @@ struct ContentView: View {
             }
         }
         
+        // MARK: UPDATE PROMPT
+        
+        .task {
+            if let storeV = await UpdateCheck.fetchStoreVersion(),
+               UpdateCheck.shouldPrompt(for: storeV) {
+                storeVersionToPrompt = storeV
+                showUpdateSheet = true
+            }
+        }
+        .sheet(isPresented: $showUpdateSheet, onDismiss: {
+            if let v = storeVersionToPrompt { UpdateCheck.markPrompted(storeVersion: v) }
+        }) {
+            VStack(spacing: 14) {
+                Text("Update available")
+                    .font(.title3).bold()
+                Text("Version (\(storeVersionToPrompt ?? "")) is available on the App Store.")
+                    .multilineTextAlignment(.center)
+                    .opacity(0.8)
+                Text("Update for new cool features!")
+                    .multilineTextAlignment(.center)
+                    .opacity(0.8)
+
+                HStack {
+                    Button("Not now") {
+                        showUpdateSheet = false
+                    }
+                    Spacer()
+                    Button("Update") {
+                        if let url = URL(string: "itms-apps://itunes.apple.com/app/id6753908572") {
+                            UIApplication.shared.open(url)
+                        }
+                        showUpdateSheet = false
+                    }
+                    .bold()
+                }
+                .padding(.top, 6)
+            }
+            .padding(20)
+            .presentationDetents([.fraction(0.28)])
+        }
+
+
+        
         .statusBarHidden(true)
         .ignoresSafeArea(.keyboard)
 
@@ -1380,7 +1427,7 @@ private extension ContentView {
                 isMapSelectOpen || isSettingsOpen || isTrophiesOpen
             }
 
-            // === Buttons row (Map + Settings + Scoreboard) ===
+            // === Buttons row (Map + Settings + Trophy + Scoreboard) ===
             HStack(spacing: 8) {
                 // MAP button
                 Button {
@@ -1389,6 +1436,7 @@ private extension ContentView {
                         else if isTrophiesOpen { isTrophiesOpen = false }
                         else { isMapSelectOpen.toggle() }
                     }
+                    Haptics.shared.tap()
                 } label: {
                     SquareHUDButton(
                         isOutlined: showNewMapToast,
@@ -1409,6 +1457,7 @@ private extension ContentView {
                         if isSettingsOpen { isSettingsOpen = false }
                         isTrophiesOpen.toggle()
                     }
+                    Haptics.shared.tap()
                 } label: {
                     SquareHUDButton(
                         isOutlined: showNewTrophyToast,
@@ -1433,6 +1482,7 @@ private extension ContentView {
                         if isMapSelectOpen { isMapSelectOpen = false }
                         isSettingsOpen.toggle()
                     }
+                    Haptics.shared.tap()
                 } label: {
                     SquareHUDButton(isOutlined: false) {
                         Image(systemName: "gearshape.fill")
@@ -1448,6 +1498,8 @@ private extension ContentView {
                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                 .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
 
+                //Spacer(minLength: 0)
+                
                 // SCOREBOARD menu button
                 Button {
                     withAnimation(.easeInOut(duration: 0.22)) {
@@ -1458,6 +1510,7 @@ private extension ContentView {
                             isScoreMenuOpen = true
                         }
                     }
+                    Haptics.shared.tap()
                 } label: {
                     SquareHUDButton(isOutlined: isScoreMenuOpen) {
                         Image("scoreboard_menu_icon")
@@ -1535,6 +1588,7 @@ private extension ContentView {
             }
         }
         .padding(.leading, 24)
+        .padding(.trailing, 96)
         .padding(.bottom, 30)
         .opacity(phase != .choosing ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: phase)
