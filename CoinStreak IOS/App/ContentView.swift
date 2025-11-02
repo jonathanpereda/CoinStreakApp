@@ -120,12 +120,26 @@ struct ContentView: View {
     //Update Prompt
     @State private var showUpdateSheet = false
     @State private var storeVersionToPrompt: String? = nil
+    
+    //Battles
+    @State private var isBattleMenuOpen = false
+    @StateObject private var battleVM = BattleMenuVM()
+    @State private var showBattleCinematic = false
+    @State private var currentBattleEvent: BattleRevealEvent?
+    @State private var currentOpponentName: String = "Opponent"
+    @StateObject private var nameVM = NameEntryVM()
+    @State private var currentMyName: String = "You"
+
 
 
     @ViewBuilder
     private func streakLayer(fontName: String) -> some View {
         VStack {
-            StreakCounter(value: store.currentStreak, fontName: fontName)
+            let visibleStreak = battleVM.maskStreakUntilReveal
+                ? (battleVM.streakValueBeforeReveal ?? store.currentStreak)
+                : store.currentStreak
+            
+            StreakCounter(value: visibleStreak, fontName: fontName)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 75)
                 .padding(.horizontal, 20)
@@ -746,11 +760,6 @@ struct ContentView: View {
                 }
 
 
-
-
-
-
-
             }
             .ignoresSafeArea()
             .ignoresSafeArea(.keyboard)
@@ -1037,6 +1046,9 @@ struct ContentView: View {
         .onChange(of: scenePhase) {_, newPhase in
             switch newPhase {
             case .active:
+                //Quick check if a battle happened
+                let id = InstallIdentity.getOrCreateInstallId()
+                Task { await battleVM.pollForRevealIfNeeded(installId: id) }
                 // Refresh every 5s; includes leaderboard only when it's open
                 scoreboardVM.startPolling(includeLeaderboard: { isLeaderboardOpen })
                 // (Optional) immediate kick so LB shows right away if open
@@ -1073,6 +1085,97 @@ struct ContentView: View {
         .onChange(of: isLeaderboardOpen) { _, open in
             if open { checkLeaderboardMedals() }
         }
+        .onChange(of: battleVM.revealPending) { _, ev in
+            guard let ev else { return }
+            
+            let me = InstallIdentity.getOrCreateInstallId()
+            if ev.loserInstallId == me {
+                Task { @MainActor in
+                    battleVM.beginStreakMask(currentVisibleStreak: store.currentStreak)
+                }
+            }
+            currentBattleEvent = ev
+
+            if let opp = ev.opponent {
+                currentOpponentName = opp.name
+            } else {
+                currentOpponentName = "Opponent"
+                let me = InstallIdentity.getOrCreateInstallId()
+                let otherId = (ev.winnerInstallId == me) ? ev.loserInstallId : ev.winnerInstallId
+                Task {
+                    if let prof = await ScoreboardAPI.fetchProfile(installId: otherId) {
+                        await MainActor.run { currentOpponentName = prof.displayName }
+                    }
+                }
+
+            }
+
+            // NEW: close the battle menu before showing the cinematic
+            if isBattleMenuOpen { isBattleMenuOpen = false }
+            
+            // --- resolve my name from server directly ---
+            Task {
+                let resolvedName: String = {
+                    // default immediately to "You" while we fetch, but we’ll overwrite before presenting
+                    "You"
+                }()
+
+                var finalName = resolvedName
+
+                // Await server name—but cap wait so we never hang the UI longer than ~300ms
+                let start = Date()
+                if let prof = await ScoreboardAPI.fetchProfile(installId: me) {
+                    finalName = prof.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if finalName.isEmpty { finalName = "You" }
+                }
+                let elapsed = Date().timeIntervalSince(start)
+
+                await MainActor.run {
+                    currentMyName = finalName
+                    // present after name is set; if fetch was super fast, still delay a hair to let covers dismiss
+                    let delay: Double = elapsed > 0.3 ? 0.0 : 0.15
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                        withAnimation(.easeIn(duration: 0.2)) { showBattleCinematic = true }
+                    }
+                }
+            }
+            // --------------------------------------------
+
+            // NEW: present the cinematic just after the cover dismisses
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(.easeIn(duration: 0.2)) { showBattleCinematic = true }
+            }
+        }
+
+
+
+
+        
+        .fullScreenCover(isPresented: $isBattleMenuOpen, onDismiss: {
+            // no-op
+        }) {
+            BattleMenuView(isOpen: $isBattleMenuOpen, vm: battleVM)
+                .onAppear {
+                    let id = InstallIdentity.getOrCreateInstallId()
+                    Task {
+                        await battleVM.loadInitial(installId: id)
+                        await battleVM.markOpened(installId: id)   // clears the “!” when opening
+                    }
+                }
+        }
+        .task {
+            let me = InstallIdentity.getOrCreateInstallId()
+            await battleVM.pollForRevealIfNeeded(installId: me) // immediate
+
+            for await _ in Timer.publish(every: 6, on: .main, in: .common).autoconnect().values {
+                if !showBattleCinematic {
+                    await battleVM.pollForRevealIfNeeded(installId: me)
+                    await battleVM.refreshLists(installId: me)        
+                }
+            }
+        }
+
+
         
         
         // MARK: UPDATE PROMPT
@@ -1115,6 +1218,64 @@ struct ContentView: View {
             .padding(20)
             .presentationDetents([.fraction(0.28)])
         }
+        
+        
+        // MARK: BATTLE CINEMATIC
+        
+        .background(
+            FadeFullScreenCover(isPresented: $showBattleCinematic) {
+                if let ev = currentBattleEvent {
+                    BattleVideoCinematic(
+                        event: ev,
+                        meInstallId: InstallIdentity.getOrCreateInstallId(),
+                        meName: currentMyName,
+                        opponentName: currentOpponentName
+                    ) {
+                        //onDone
+                        withAnimation(.easeOut(duration: 0.2)) { showBattleCinematic = false }
+
+                        if !ev.eventId.hasPrefix("local-") {
+                            Task {
+                                await battleVM.ackReveal(
+                                    installId: InstallIdentity.getOrCreateInstallId(),
+                                    eventId: ev.eventId
+                                )
+                                await battleVM.pollForRevealIfNeeded(
+                                    installId: InstallIdentity.getOrCreateInstallId()
+                                )
+                            }
+                        }
+
+                        Task {
+                            let me = InstallIdentity.getOrCreateInstallId()
+                            if let s = await ScoreboardAPI.fetchState(installId: me) {
+                                await MainActor.run {
+                                    battleVM.myStreak = s.currentStreak
+                                    store.currentStreak = s.currentStreak
+                                }
+                                StreakSync.shared.seedAcked(to: s.currentStreak)
+                            }
+                            await MainActor.run { battleVM.endStreakMask() }
+                        }
+
+                        battleVM.recordRevealResult(
+                            event: ev,
+                            myInstallId: InstallIdentity.getOrCreateInstallId(),
+                            myName: currentMyName,
+                            myOpponentName: currentOpponentName
+                        )
+
+                        battleVM.revealPending = nil
+                        // === end onDone ===
+                    }
+                    .ignoresSafeArea()                 // keep edge-to-edge
+                    .statusBarHidden(true)
+                    // (no need for interactiveDismissDisabled; there’s no drag handle)
+                } else {
+                    Color.black.ignoresSafeArea()      // defensive fallback
+                }
+            }
+        )
 
 
         
@@ -1696,9 +1857,46 @@ private extension ContentView {
                             .resizable()
                             .interpolation(.high)
                             .scaledToFit()
-                            .frame(width: 22, height: 22)
+                            .frame(width: 25, height: 25)
                             .opacity(0.8)
                         }
+                }
+                .buttonStyle(.plain)
+                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
+                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
+                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
+                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+                
+                
+                //BATTLES menu button
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                        isBattleMenuOpen = true
+                    }
+                    Haptics.shared.tap()
+                } label: {
+                    SquareHUDButton(isOutlined: false) {
+                        ZStack(alignment: .topTrailing) {
+                            Image("battles_menu_icon")
+                                .resizable()
+                                .interpolation(.high)
+                                .scaledToFit()
+                                .frame(width: 22, height: 22)
+                                .opacity(0.8)
+
+                            if battleVM.hasAttention {
+                                Text("!")
+                                    .font(.system(size: 11, weight: .black, design: .rounded))
+                                    .foregroundColor(.black.opacity(0.9))
+                                    .frame(width: 16, height: 16)
+                                    .background(Color.yellow.opacity(0.95))
+                                    .clipShape(Circle())
+                                    .offset(x: 6, y: -6) // nudge to corner
+                                    .transition(.scale.combined(with: .opacity))
+                            }
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
                 .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)

@@ -22,9 +22,9 @@ enum InstallIdentity {
         _ = saveKeychain(key: kInstallSideKey, value: side)
     }
 
-    // MARK: - Debug helpers (remove keys)  // NEW
+    // MARK: - Debug helpers (remove keys)
     @discardableResult
-    static func removeLockedSide() -> Bool {     // NEW
+    static func removeLockedSide() -> Bool {
         SecItemDelete([
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrAccount as String: kInstallSideKey
@@ -32,7 +32,7 @@ enum InstallIdentity {
     }
 
     @discardableResult
-    static func removeInstallId() -> Bool {      // NEW
+    static func removeInstallId() -> Bool {      
         SecItemDelete([
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrAccount as String: kInstallIdKey

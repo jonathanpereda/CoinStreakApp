@@ -3,11 +3,11 @@ import Foundation
 enum ScoreboardAPI {
     // Replace with your deployed Worker base URL if different
     
-    #if targetEnvironment(simulator)
-    private static let base = URL(string: "http://127.0.0.1:8787")!
-    #else
+    //#if targetEnvironment(simulator)
+    //private static let base = URL(string: "http://127.0.0.1:8787")!
+    //#else
     private static let base = URL(string: "https://coinstreak-scoreboard.jonathanp.workers.dev")!
-    #endif
+    //#endif
 
     struct RetireResponse: Decodable {
         let ok: Bool

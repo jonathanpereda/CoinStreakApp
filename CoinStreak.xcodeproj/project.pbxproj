@@ -28,6 +28,8 @@
 		A4CB79FE2E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
 		A4CB79FF2E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
 		A4CB7A002E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
+		A4D316B92EB7034700C9057B /* battle_lose_red.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = A4D316B72EB7034700C9057B /* battle_lose_red.mp4 */; };
+		A4D316BA2EB7034700C9057B /* battle_win_green.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = A4D316B82EB7034700C9057B /* battle_win_green.mp4 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +61,8 @@
 		A45109552E90546100E4AE05 /* CoinStreak IOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CoinStreak IOSTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A451095F2E90546100E4AE05 /* CoinStreak IOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CoinStreak IOSUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Herculanum.ttf; sourceTree = "<group>"; };
+		A4D316B72EB7034700C9057B /* battle_lose_red.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = battle_lose_red.mp4; sourceTree = "<group>"; };
+		A4D316B82EB7034700C9057B /* battle_win_green.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = battle_win_green.mp4; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -113,6 +117,8 @@
 				A45109582E90546100E4AE05 /* CoinStreak IOSTests */,
 				A45109622E90546100E4AE05 /* CoinStreak IOSUITests */,
 				A45109132E904C7E00E4AE05 /* Products */,
+				A4D316B72EB7034700C9057B /* battle_lose_red.mp4 */,
+				A4D316B82EB7034700C9057B /* battle_win_green.mp4 */,
 			);
 			sourceTree = "<group>";
 		};
@@ -264,6 +270,8 @@
 				A41B99E22E991F0B00D7059D /* BebasNeue-Regular.ttf in Resources */,
 				A41B99C82E97A64C00D7059D /* HVD_Peace.ttf in Resources */,
 				A41B99D82E986E1200D7059D /* Arial Black.ttf in Resources */,
+				A4D316B92EB7034700C9057B /* battle_lose_red.mp4 in Resources */,
+				A4D316BA2EB7034700C9057B /* battle_win_green.mp4 in Resources */,
 				A41B99E42E99329F00D7059D /* blowbrush.ttf in Resources */,
 				A41B99732E93602900D7059D /* Beirut.ttc in Resources */,
 				A41B99D42E97CA3A00D7059D /* Audiowide-Regular.ttf in Resources */,
