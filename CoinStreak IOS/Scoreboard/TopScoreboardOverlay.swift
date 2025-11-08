@@ -98,17 +98,17 @@ struct TopScoreboardOverlay: View {
                     let posY = lbY       + boxOriginPx.y * s + boxH/2
 
                     // Debug-on version so you can see it
-                    NameEntryBar(vm: nameVM,           // <-- make sure nameVM is in scope here (StateObject up in this view)
-                                  boxSize: .init(width: boxW, height: boxH),
-                                  showDebug: false)      
-                    .position(x: posX, y: posY)
+                    NameEntryBar(vm: nameVM,
+                                  boxSize: .init(width: boxW, height: boxH+6),
+                                  showDebug: false)
+                    .position(x: posX+28, y: posY+12)
                     .zIndex(20_000)
                     .allowsHitTesting(true)
                     
-                    Text("Tap name to report")
+                    /*Text("Tap name to report")
                         .font(.system(size: 8, weight: .semibold))
                         .position(x: posX + 115, y: posY+5)
-                        .foregroundStyle(.red.opacity(0.5))
+                        .foregroundStyle(.red.opacity(0.5))*/
                 }
                 if isLeaderboardOpen {
                     LeaderboardContent(
@@ -196,8 +196,8 @@ struct TopScoreboardOverlay: View {
                     if !isLeaderboardOpen {
                         Image("expand_leaderboard_button")
                             .resizable()
-                            .frame(width: expandBtnFrame.width, height: expandBtnFrame.height)
-                            .position(x: expandBtnFrame.midX, y: expandBtnFrame.midY)
+                            .frame(width: expandBtnFrame.width + 20, height: expandBtnFrame.height + 10)
+                            .position(x: expandBtnFrame.midX + 10, y: expandBtnFrame.midY)
                             .allowsHitTesting(false)
                             .zIndex(2)
                     }

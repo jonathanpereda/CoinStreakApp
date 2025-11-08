@@ -106,7 +106,7 @@ struct BattleMenuView: View {
                     Group {
                         // Player name text
                         NameEntryBar(vm: nameVM,
-                                     boxSize: CGSize(width: pw(773, W) - pw(140, W), height: ph(88, H)),
+                                     boxSize: CGSize(width: pw(900, W) - pw(140, W), height: ph(88, H)),
                                      showDebug: false)
                             .frame(width: pw(773, W) - pw(140, W), height: ph(88, H))
                             .position(

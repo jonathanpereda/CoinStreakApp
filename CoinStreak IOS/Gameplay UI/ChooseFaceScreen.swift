@@ -36,8 +36,8 @@ private struct MiniSpriteCoinImage: View {
 
     var body: some View {
         TimelineView(.animation) { timeline in
-            let name = plan.map { spriteFrameFor(plan: $0, now: timeline.date) }
-                        ?? (idleFace == .H ? "coin_H" : "coin_T")
+            let name = plan.map { spriteFrameFor(plan: $0, now: timeline.date, coinKey: "starter") }
+                        ?? (idleFace == .H ? "starter_coin_H" : "starter_coin_T")
 
             Image(name)
                 .resizable()

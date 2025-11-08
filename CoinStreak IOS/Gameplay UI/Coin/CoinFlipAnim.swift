@@ -16,31 +16,35 @@ struct SpriteFlipPlan: Equatable {
     let duration:  Double         // seconds
 }
 
+private func equippedCoinKey() -> String {
+    UserDefaults.standard.string(forKey: "equipped.coin.key") ?? "starter"
+}
+
 /// Frame-naming helper: frames are named coin_HT_0001 ... coin_TH_0036
 private func atlasFrameName(prefix: String, idx1based: Int) -> String {
     String(format: "%@_%04d", prefix, idx1based)
 }
 
-/// Build the alternating atlas run list using real frame prefixes
-private func buildAtlasRun(start: CoinSide, halfTurns: Int) -> [(prefix: String, frameCount: Int, skipFirst: Bool)] {
+/// Build the alternating atlas run list using real frame prefixes for the given coin key
+private func buildAtlasRun(start: CoinSide, halfTurns: Int, coinKey: String) -> [(prefix: String, frameCount: Int, skipFirst: Bool)] {
     var list: [(String, Int, Bool)] = []
     var cur = start
     for i in 0..<halfTurns {
         let next: CoinSide = (cur == .H) ? .T : .H
-        // Use frame name prefixes
-        let prefix = (cur == .H && next == .T) ? "coin_HT" : "coin_TH"
-        list.append((prefix, 36, i > 0 /* skip first frame after the first run */))
+        let core = (cur == .H && next == .T) ? "coin_HT" : "coin_TH"
+        let prefix = "\(coinKey)_\(core)"
+        list.append((prefix, 36, i > 0))
         cur = next
     }
     return list
 }
 
 /// Given a flip plan and "now", compute which image name we should be on.
-func spriteFrameFor(plan: SpriteFlipPlan, now: Date) -> String {
+func spriteFrameFor(plan: SpriteFlipPlan, now: Date, coinKey: String) -> String {
     let elapsed = max(0, now.timeIntervalSince(plan.startTime))
     // Clamp 0...duration
     let t = min(elapsed, plan.duration)
-    let atlases = buildAtlasRun(start: plan.startFace, halfTurns: plan.halfTurns)
+    let atlases = buildAtlasRun(start: plan.startFace, halfTurns: plan.halfTurns, coinKey: coinKey)
 
     // Total frames accounting for skips
     let totalFrames = atlases.reduce(0) { $0 + $1.frameCount - ($1.skipFirst ? 1 : 0) }
@@ -59,13 +63,14 @@ func spriteFrameFor(plan: SpriteFlipPlan, now: Date) -> String {
             remaining -= effective
         }
     }
-    // Shouldn’t happen, but fall back to the final idle
-    let finalPrefix = (plan.endFace == .H) ? "coin_flip_TH" : "coin_flip_HT"
-    return atlasFrameName(prefix: finalPrefix, idx1based: 36)
+    // Defensive fallback to static face
+    return staticFaceImage(plan.endFace, coinKey: coinKey)
 }
 
 /// Static image names for rest frames provided: coin_H / coin_T
-func staticFaceImage(_ face: CoinSide) -> String { face == .H ? "coin_H" : "coin_T" }
+func staticFaceImage(_ face: CoinSide, coinKey: String) -> String {
+    return face == .H ? "\(coinKey)_coin_H" : "\(coinKey)_coin_T"
+}
 
 /// Small per-asset visual tweaks because the new images have a larger alpha box.
 struct CoinVisualTweak {
@@ -82,14 +87,19 @@ struct SpriteCoinImage: View {
     let width: CGFloat
     let position: CGPoint
 
+    var coinKey: String? = nil   // if nil, uses equipped key from UserDefaults
+
+    private var resolvedCoinKey: String { coinKey ?? equippedCoinKey() }
+
     var body: some View {
         TimelineView(.animation) { timeline in
             let now = timeline.date
+            let key = resolvedCoinKey
             let name: String = {
                 if let p = plan {
-                    return spriteFrameFor(plan: p, now: now)
+                    return spriteFrameFor(plan: p, now: now, coinKey: key)
                 } else {
-                    return staticFaceImage(idleFace)
+                    return staticFaceImage(idleFace, coinKey: key)
                 }
             }()
             Image(name)
@@ -223,5 +233,3 @@ func flightParams(
 
     return (halfTurns, total, jump, isSuper)
 }
-
-

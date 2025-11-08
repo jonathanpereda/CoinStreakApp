@@ -25,6 +25,7 @@ struct NameEntryBar: View {
                     .frame(width: boxW, height: boxH)
                     .focused($isFocused)
                     .disabled(!vm.canChange)
+                    .padding(.trailing, (isFocused && vm.canChange && saveEnabled) ? (boxH * 2.4) : 0)
                     .opacity(overlayText == nil ? 1 : 0)      // hide name while flashing overlay
                     // Enforce 7-char hard cap + allowed chars
                     .onChange(of: vm.currentName) { _, newVal in
@@ -79,29 +80,30 @@ struct NameEntryBar: View {
             .simultaneousGesture(                       // keep the force-focus you added
                 TapGesture().onEnded { if vm.canChange { isFocused = true } }
             )
-
-            // SAVE (only while editing & changed & valid)
-            if isFocused && vm.canChange && saveEnabled {
-                Button {
-                    Task { await handleSaveTapped() }    // NEW
-                } label: {
-                    Text("Save")
-                        .font(.system(size: boxH * 0.46, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, boxH * 0.45)
-                        .frame(height: boxH)
-                        .background(
-                            (showDebug ? Color.blue.opacity(0.35) : Color.clear)
-                                .background(.ultraThinMaterial.opacity(0.35))
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: corner))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: corner)
-                                .stroke(.white.opacity(0.22), lineWidth: 1)
-                        )
+            .overlay(alignment: .trailing) {
+                if isFocused && vm.canChange && saveEnabled {
+                    Button {
+                        Task { await handleSaveTapped() }
+                    } label: {
+                        Text("Save")
+                            .font(.system(size: boxH * 0.46, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, boxH * 0.45)
+                            .frame(height: boxH)
+                            .background(
+                                (showDebug ? Color.blue.opacity(0.35) : Color.clear)
+                                    .background(.ultraThinMaterial.opacity(0.35))
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: corner))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: corner)
+                                    .stroke(.white.opacity(0.22), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, boxH * 0.12) // small gap from the right edge
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
-                .buttonStyle(.plain)
-                .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
         }
         .animation(.easeInOut(duration: 0.18), value: isFocused)

@@ -12,7 +12,7 @@ import Combine
 
 ///MISC
 
-private enum AppPhase { case choosing, preRoll, playing }
+private enum AppPhase { case choosing, preRoll, playing, shop }
 
 // Score board
 private func panelWidth() -> CGFloat {
@@ -52,9 +52,27 @@ struct ContentView: View {
     @AppStorage("ach.progress.alt_last_raw")
     private var alternatingLastRaw: String = ""
     @AppStorage("ach.progress.total_flips") private var totalFlips: Int = 0
-
-
     
+    // TOKENS
+    private let TOKENS_PER_FILL = 1000
+    @AppStorage("tokens.balance") private var tokenBalance: Int = 0
+    
+    //SHOP
+    @StateObject private var shopVM = ShopVM()
+    @State private var restoreCounterAfterOpen = false
+    // Shop fade-in opacity (0…1)
+    @State private var shopOpacity: Double = 0.0
+    @State private var showShopUI: Bool = false
+    @State private var lastLevelIndexBeforeShop: Int = 0     // remember where we came from
+    @State private var pendingEnterShopAfterClose = false    // already used for enter → shop
+    @State private var pendingExitShopToIndex: Int? = nil    // where to go after we CLOSE
+    @State private var suppressStreakUntilCloseEnds = false  // hide streak during close-out from shop
+    @State private var isDoorsClosing: Bool = false  // gate opening shop while the CLOSE animation is in progress
+    @State private var isDoorsOpening = false
+    @AppStorage("equipped.table.key") private var equippedTableKey: String = "starter"
+    @AppStorage("equipped.table.image") private var equippedTableImage: String = ""
+    @AppStorage("equipped.coin.key") private var equippedCoinKey: String = "starter"
+
     // Map menu stuff
     @Environment(\.scenePhase) private var scenePhase
     @State private var isMapSelectOpen = false
@@ -188,30 +206,41 @@ struct ContentView: View {
             ZStack {
                 
                 ElevatorSwitcher(
-                    currentBackwallName: theme.backwall,
+                    currentBackwallName: (phase == .shop ? "shop_backwall" : theme.backwall),
                     starterSceneName: "starter_backwall",
                     doorLeftName: "starter_left",
                     doorRightName: "starter_right",
                     belowDoors: {
                         // shows during open/close and when open
-                        streakLayer(fontName: fontBelowName)
+                        if phase != .shop && !suppressStreakUntilCloseEnds {
+                            streakLayer(fontName: fontBelowName)
+                        }
                     },
                     aboveDoors: {
                         // top copy, animate with counterOpacity
-                        streakLayer(fontName: fontAboveName)
-                            .opacity(counterOpacity)
+                        if phase != .shop && !suppressStreakUntilCloseEnds {
+                            streakLayer(fontName: fontAboveName)
+                                .opacity(counterOpacity)
+                        }
                     },
                     onOpenEnded: {
-                        // nothing needed for fonts here
+                        if restoreCounterAfterOpen {
+                            withAnimation(.easeInOut(duration: 0.25)) { counterOpacity = 1.0 }
+                            restoreCounterAfterOpen = false
+                        }
+                        isDoorsOpening = false
                     },
                     onCloseEnded: {
+                        isDoorsClosing = false
+                        showShopUI = false
+                        shopOpacity = 0.0
                         // doors just finished closing on Starter → switch both to Starter font, then (optionally) fade top in
                         let now = Date()
                         doorDustTrigger = now
                         // auto-clear after the effect ends (keep in sync with DoorDustLine.duration)
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.60) {
                             if doorDustTrigger == now { doorDustTrigger = nil }
-                        }   
+                        }
                         let starterFont = tierTheme(for: "Starter").font
                         fontBelowName = starterFont
                         fontAboveName = starterFont
@@ -222,7 +251,27 @@ struct ContentView: View {
                         // If a manual nonstarter→nonstarter selection is waiting, jump to it now (this triggers OPEN)
                         if let pending = manualTargetAfterClose {
                             manualTargetAfterClose = nil
-                            progression.jumpToLevelIndex(pending)   
+                            progression.jumpToLevelIndex(pending)
+                        }
+                        // Entering shop from a non-starter: switch to shop now (will OPEN)
+                        if pendingEnterShopAfterClose {
+                            pendingEnterShopAfterClose = false
+                            withAnimation(.easeInOut(duration: 0.2)) { phase = .shop }
+                            return
+                        }
+
+                        // Exiting shop: we just finished the CLOSE to Starter
+                        if let idx = pendingExitShopToIndex {
+                            // Allow streak to show again (we hid it only during the close)
+                            suppressStreakUntilCloseEnds = false
+                            // Now OPEN to the previous map
+                            pendingExitShopToIndex = nil
+                            progression.jumpToLevelIndex(idx)     // starter → non-starter triggers OPEN
+                        } else {
+                            // Exiting to Starter (no reopen)
+                            suppressStreakUntilCloseEnds = false
+                            // Bring the streak back now that the doors are fully closed
+                            withAnimation(.easeInOut(duration: 0.25)) { counterOpacity = 1.0 }
                         }
 
                     }
@@ -235,7 +284,11 @@ struct ContentView: View {
                         .allowsHitTesting(false)
                 }
 
-                Image("starter_table2")
+                let sideLetter: String = {
+                    if let f = store.chosenFace { return (f == .Heads ? "h" : "t") }
+                    return "h" // safe default while we restore face
+                }()
+                Image(equippedTableImage.isEmpty ? "starter_table_\(sideLetter)" : equippedTableImage)
                     .resizable()
                     .scaledToFill()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -244,11 +297,9 @@ struct ContentView: View {
                 
                 // MARK: BAR & BADGE
                 
-                // HUD: progress bar + chosen-face badge (single instance, top of stack)
-                if phase != .choosing, let icon = chosenIconName(store.chosenFace) {
-                    let iconSize: CGFloat = 52
+                // HUD: progress bar
+                if phase != .choosing {
                     let barWidth = min(geo.size.width * 0.70, 360)
-                    let extraRight: CGFloat = 20
 
                     HStack(spacing: 24) {
                         let tiltXDeg: Double = -14
@@ -290,32 +341,50 @@ struct ContentView: View {
                         .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                         .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
 
-
-
-                        Image(icon)
-                            .resizable()
-                            .interpolation(.high)
-                            .antialiased(true)
-                            .renderingMode(.original)
-                            .frame(width: iconSize, height: iconSize)
-                            .shadow(color: iconPulse ? .yellow.opacity(0.5) : .clear,
-                                    radius: iconPulse ? 3 : 0)
-                            .animation(.easeOut(duration: 0.25), value: iconPulse)
-                            .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
-                            .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
-                            .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
-                            .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
                     }
-                    .padding(.trailing, geo.safeAreaInsets.trailing + extraRight)
-                    .padding(.bottom, geo.safeAreaInsets.bottom + 36)
+                    .padding(.trailing, geo.safeAreaInsets.trailing + 96)
+                    .padding(.bottom, geo.safeAreaInsets.bottom + 50)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .allowsHitTesting(false)
                     .zIndex(50)                // keep above table/gameplay
                     .transition(.opacity)
                     
                     
-                    .overlay(alignment: .bottomLeading) {
+                    /*.overlay(alignment: .bottomLeading) {
                         bottomMenuOverlay(geo)
+                    }*/
+                    .overlay(alignment: .bottomLeading) {
+                        ZStack(alignment: .bottomLeading) {
+                            bottomMenuOverlay(geo) // this already hides itself in .shop per your logic
+                            if phase == .shop {
+                                exitShopButton(geo)
+                                    .opacity(shopOpacity)
+                            }
+                        }
+                    }
+                    .overlay(alignment: .topLeading) {
+                        if showShopUI {
+                            ShopOverlay(
+                                vm: shopVM,
+                                tokenBalance: $tokenBalance,
+                                size: geo.size,
+                                equippedTableImage: $equippedTableImage,
+                                equippedTableKey: $equippedTableKey,
+                                equippedCoinKey: $equippedCoinKey,
+                                sideProvider: { (store.chosenFace == .Heads) ? "h" : "t" }
+                            )
+                            .opacity(shopOpacity)
+                        }
+                    }
+                    .onChange(of: phase) { _, newPhase in
+                        if newPhase == .shop {
+                            showShopUI = true
+                            // Start hidden, then fade in while doors are opening
+                            shopOpacity = 0.0
+                            withAnimation(.easeInOut(duration: 1.2)) {
+                                shopOpacity = 1.0
+                            }
+                        }
                     }
 
 
@@ -354,11 +423,13 @@ struct ContentView: View {
                             plan: spritePlan,
                             idleFace: (curState == "Heads") ? .H : .T,
                             width: coinD,
-                            position: .init(x: W/2, y: coinCenterY)
+                            position: .init(x: W/2, y: coinCenterY),
+                            coinKey: equippedCoinKey
                         )
                         .offset(y: y + CGFloat(bounceY(settleBounceT)))
                         .scaleEffect(scale)
                     }
+                    .zIndex(100)
                     .modifier(SettleWiggle(t: settleT))
                     .modifier(SettleBounce(t: settleBounceT))
                     .allowsHitTesting(false)
@@ -369,7 +440,7 @@ struct ContentView: View {
 
 
                 // MARK: INPUT HITBOX
-                if phase == .playing {
+                if phase == .playing || phase == .shop {
                     // Tune these two lines to adjust the band:
                     let topSafeInset: CGFloat    = max(geo.safeAreaInsets.top,     H * 0.22)
                     let bottomSafeInset: CGFloat = max(geo.safeAreaInsets.bottom,  H * 0.055)
@@ -390,19 +461,20 @@ struct ContentView: View {
                                     // Only accept gestures that START inside the band
                                     let startY = v.startLocation.y
                                     guard startY >= bandMinY && startY <= bandMaxY else { return }
+                                    let visualOnly = (phase == .shop)
 
                                     let dx = v.translation.width
                                     let dy = v.translation.height
                                     if hypot(dx, dy) < 10 {
                                         guard !disableTapFlip else { return }
-                                        flipCoin()
+                                        flipCoin(visualOnly: visualOnly)
                                     } else {
                                         let up = max(0, -dy)
                                         let predUp = max(0, -v.predictedEndTranslation.height)
                                         let extra = max(0, predUp - up)
                                         let raw = Double(up) + 0.5 * Double(extra)
                                         let impulse = raw / Double(H * 0.70)
-                                        if impulse > 0.15 { flipCoin(impulse: impulse) }
+                                        if impulse > 0.15 { flipCoin(impulse: impulse, visualOnly: visualOnly) }
                                     }
                                 }
                         )
@@ -416,7 +488,7 @@ struct ContentView: View {
             
 
                 // MARK: RECENT FLIPS COLUMN
-                if phase != .choosing, !store.recent.isEmpty {
+                if phase == .playing, !store.recent.isEmpty {
                     // Where the BOTTOM should live (0.0 = top, 1.0 = bottom)
                     let baselineYPct: CGFloat = 0.30   // mid-left baseline
                     let baselineY = geo.size.height * baselineYPct
@@ -531,6 +603,8 @@ struct ContentView: View {
                                                 }
                                                 return
                                             }
+                                            
+                                            guard !isDoorsClosing && !isDoorsOpening else { return }
 
                                             let targetLI = levelIndexForTile(targetTile)
                                             let onStarter = (currentTile == 0)
@@ -671,7 +745,7 @@ struct ContentView: View {
                                     }
 
                                     // SFX tile
-                                    SettingsTile(size: 90, label: "Sounds Effects") {
+                                    SettingsTile(size: 90, label: "Sound Effects") {
                                         ZStack {
                                             Text("SFX")
                                                 .font(.system(size: 90 * 0.78 * 0.34, weight: .semibold))
@@ -938,6 +1012,9 @@ struct ContentView: View {
                             gameplayOpacity  = 1
                             phase            = .playing
                         }
+                        
+                        syncEquippedTableToFaceAndKey()
+                        syncEquippedCoinWithVM()
 
                         // register (safe if already registered)
                         await ScoreboardAPI.register(installId: installId, side: face)
@@ -960,6 +1037,9 @@ struct ContentView: View {
                 baseFaceAtLaunch = store.chosenFace!.rawValue
                 gameplayOpacity  = 1
                 phase            = .playing
+                
+                syncEquippedTableToFaceAndKey()
+                syncEquippedCoinWithVM()
 
                 let installId = InstallIdentity.getOrCreateInstallId()
                 Task {
@@ -1013,6 +1093,7 @@ struct ContentView: View {
 
             sfxMutedUI   = SoundManager.shared.isSfxMuted
             musicMutedUI = SoundManager.shared.isMusicMuted
+            
         }
         
         // MARK: ON CHANGES
@@ -1029,12 +1110,16 @@ struct ContentView: View {
             if oldName == "Starter" && newName != "Starter" {
                 // OPENING: switch the BELOW font immediately to the new tier
                 fontBelowName = newTheme.font
+                
+                isDoorsOpening = true
+                
                 // top copy is fading out anyway, so no need to change fontAboveName now
             } else if oldName != "Starter" && newName == "Starter" {
                 // CLOSING: keep BELOW font as the OLD tier during the close
                 // (do NOT change fontBelowName yet)
                 // after doors close, onCloseEnded will set both to Starter
                 deferCounterFadeInUntilClose = true
+                isDoorsClosing = true
             } else {
                 // Shouldn't happen with alternating logic, but incase:
                 fontBelowName = newTheme.font
@@ -1147,7 +1232,18 @@ struct ContentView: View {
             }
         }
 
+        .onChange(of: store.chosenFace) { _, _ in
+            // Face shouldn’t change, but this keeps things future-proof
+            syncEquippedTableToFaceAndKey()
+            syncEquippedCoinWithVM()
+        }
 
+        .onChange(of: equippedTableKey) { _, _ in
+            // If key changes (e.g., future UI), ensure image follows the key + current face
+            let side = (store.chosenFace == .Heads) ? "h" : "t"
+            let target = "\(equippedTableKey)_table_\(side)"
+            if equippedTableImage != target { equippedTableImage = target }
+        }
 
 
         
@@ -1170,7 +1266,7 @@ struct ContentView: View {
             for await _ in Timer.publish(every: 6, on: .main, in: .common).autoconnect().values {
                 if !showBattleCinematic {
                     await battleVM.pollForRevealIfNeeded(installId: me)
-                    await battleVM.refreshLists(installId: me)        
+                    await battleVM.refreshLists(installId: me)
                 }
             }
         }
@@ -1284,6 +1380,99 @@ struct ContentView: View {
 
     }
     
+    //SHOP HELPERS
+    
+    private func enterShop() {
+        guard phase != .shop else { return }
+        guard !isDoorsClosing else { return }
+        isDoorsOpening = true
+
+        // Close panels
+        isMapSelectOpen = false
+        isSettingsOpen = false
+        isTrophiesOpen = false
+        isBattleMenuOpen = false
+
+        // Remember where we were
+        lastLevelIndexBeforeShop = currentTileIndex()
+
+        // Fade streak out BEFORE any doors move
+        withAnimation(.easeInOut(duration: 0.2)) { counterOpacity = 0 }
+
+        if lastLevelIndexBeforeShop == 0 {
+            // Starter (doors closed) → switch to shop and let OPEN run
+            withAnimation(.easeInOut(duration: 0.2)) { phase = .shop }
+        } else {
+            // Non-starter (doors open) → CLOSE first (via Starter), then go to shop on close-end
+            pendingEnterShopAfterClose = true
+            progression.jumpToLevelIndex(0)   // triggers CLOSE (shop switch will happen in onCloseEnded)
+        }
+    }
+
+    private func exitShop() {
+        guard phase == .shop else { return }
+        guard !isDoorsOpening else { return }
+        //shopOpacity = 0.0
+        isDoorsClosing = true
+        withAnimation(.easeInOut(duration: 0.8)) {
+            shopOpacity = 0.0
+        }
+
+
+        // While closing out of the shop, keep streak hidden the whole time
+        suppressStreakUntilCloseEnds = true
+
+        if lastLevelIndexBeforeShop == 0 {
+            // We want to end on Starter (doors closed). Force a CLOSE from shop → starter.
+            withAnimation(.easeInOut(duration: 0.2)) { phase = .playing }
+            progression.jumpToLevelIndex(0)   // prev = shop_backwall (non-starter), new = starter → CLOSE
+            pendingExitShopToIndex = nil
+        } else {
+            // We want to CLOSE to Starter then immediately OPEN to the previous non-starter.
+            pendingExitShopToIndex = levelIndexForTile(lastLevelIndexBeforeShop)
+            withAnimation(.easeInOut(duration: 0.2)) { phase = .playing }
+            progression.jumpToLevelIndex(0)   // triggers CLOSE; reopen happens in onCloseEnded
+        }
+    }
+    
+    @ViewBuilder
+    private func exitShopButton(_ geo: GeometryProxy) -> some View {
+        HStack(spacing: 8) {
+            Button(action: { exitShop() }) {
+                SquareHUDButton(isOutlined: false) {
+                    Image(systemName: "xmark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 20, height: 20)
+                        .opacity(0.9)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.leading, 24)
+        .padding(.trailing, 96)
+        .padding(.bottom, 30)
+    }
+    
+    private func syncEquippedTableToFaceAndKey() {
+        // Decide key: prefer ShopVM’s persisted equip, fall back to our AppStorage
+        let keyFromVM = shopVM.equipped[.tables] ?? equippedTableKey
+        if equippedTableKey != keyFromVM { equippedTableKey = keyFromVM }
+
+        // Decide face letter (default to h if unknown)
+        let side = (store.chosenFace == .Heads) ? "h" : "t"
+
+        let targetImage = "\(equippedTableKey)_table_\(side)"
+        if equippedTableImage != targetImage {
+            equippedTableImage = targetImage
+        }
+    }
+    
+    private func syncEquippedCoinWithVM() {
+        let keyFromVM = shopVM.equipped[.coins] ?? equippedCoinKey
+        if equippedCoinKey != keyFromVM { equippedCoinKey = keyFromVM }
+    }
+    
     ////SOME MAP HELPERS
     
     /// Map tile index (0 = Starter, 1+ = non-starters) → canonical levelIndex
@@ -1375,11 +1564,11 @@ struct ContentView: View {
     // MARK: - FLIP LOGIC
     
     // Keep the no-arg for taps
-    func flipCoin() { flipCoin(impulse: nil) }
+    func flipCoin(visualOnly: Bool = false) { flipCoin(impulse: nil, visualOnly: visualOnly) }
 
-    // New: impulse-aware flip
-    func flipCoin(impulse: Double?) {
-        guard phase == .playing else { return }
+    // Impulse-aware flip with visual-only mode for shop
+    func flipCoin(impulse: Double?, visualOnly: Bool = false) {
+        guard phase == .playing || (visualOnly && phase == .shop) else { return }
         guard !isFlipping && !isTierTransitioning else { return }
 
         // Cancel wobble/bounce & reset pose instantly
@@ -1469,29 +1658,27 @@ struct ContentView: View {
             
             // If this was a “super” swipe, also do the dust burst + thud like hero drop
             if currentFlipWasSuper {
+                // Always show the dust impact; only award achievements in normal play
                 triggerDustImpactFromLanding()
-                
-                // ACHIEVEMENT: High Flyer
-                if achievements.unlock(.highFlyer) {
-                    // show a brief toast + glow the Trophies button
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
-                        showNewTrophyToast = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                        withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
-                            showNewTrophyToast = false
+                if !visualOnly {
+                    if achievements.unlock(.highFlyer) {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                            showNewTrophyToast = true
                         }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                                showNewTrophyToast = false
+                            }
+                        }
+                        SoundManager.shared.play("trophy_unlock")
+                        Haptics.shared.success()
                     }
-                    // sfx
-                    SoundManager.shared.play("trophy_unlock")
-                    Haptics.shared.success()
                 }
- 
                 currentFlipWasSuper = false
             }
 
             // (unchanged) streak / award / tier / SFX logic
-            if let faceVal = Face(rawValue: desired) {
+            if !visualOnly, let faceVal = Face(rawValue: desired) {
                 let preStreak = store.currentStreak
                 let wasSuccess = (faceVal == store.chosenFace)
                 
@@ -1707,6 +1894,9 @@ struct ContentView: View {
                                 
                                 // 2) Count this fill
                                 progression.registerBarFill()
+                                
+                                // Award tokens per completed bar fill
+                                tokenBalance &+= TOKENS_PER_FILL
 
                                 // --- Only for LOCKED mode, clear the model *now* to avoid jitter ---
                                 if progression.mapLocked {
@@ -1815,6 +2005,25 @@ private extension ContentView {
                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                 .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+                
+                //SHOP button
+                Button {
+                    enterShop()
+                    Haptics.shared.tap()
+                } label: {
+                    SquareHUDButton(isOutlined: false) {
+                        Image(systemName: "storefront.fill")
+                            .resizable().scaledToFit()
+                            .frame(width: 22, height: 22)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+                .buttonStyle(.plain)
+                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
+                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
+                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
+                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
 
                 // SETTINGS button
                 Button {
@@ -1904,6 +2113,7 @@ private extension ContentView {
                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                 .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+                
             }
 
             // === Map toast ===
@@ -1967,7 +2177,7 @@ private extension ContentView {
         .padding(.leading, 24)
         .padding(.trailing, 96)
         .padding(.bottom, 30)
-        .opacity(phase != .choosing ? 1 : 0)
+        .opacity((phase != .choosing && phase != .shop) ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: phase)
     }
 }
