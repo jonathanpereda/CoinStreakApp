@@ -29,9 +29,15 @@ final class ProgressionManager: ObservableObject {
             }
         }
     }
+    // One-time rebalance baseline (v1.1): bar difficulty grows from this fill count forward.
+    @Published private(set) var rebalanceBaselineFills: Int {
+        didSet { UserDefaults.standard.set(rebalanceBaselineFills, forKey: kBaselineFills_v110) }
+    }
     
     private let kDidMigrateUnlocks_v101 = "didMigrateUnlocks_v101"
     private let kHighestTileVisited     = "highestTileVisited_v1" // 0 = Starter
+    private let kBaselineFills_v110     = "pm_baselineFills_v110"
+    private let kDidRebalanceTokens_v110 = "didRebalanceTokens_v110"
 
     @Published var highestTileVisited: Int {
         didSet {
@@ -80,11 +86,14 @@ final class ProgressionManager: ObservableObject {
         let i = (levelIndex / 2) % max(nonStarterNames.count, 1)
         return nonStarterNames[i]
     }
+    /// Difficulty tier for the progress bar only (decoupled from unlocks).
+    /// After v1.1 rebalance, this starts at 0 for all existing users.
+    var barTier: Int {
+        return max(0, totalFills - rebalanceBaselineFills)
+    }
     var currentBarTotal: Int {
-        //max(1, linear.baseTargetFlips + levelIndex * linear.incrementPerLevel)
-        // grows every time the bar completes, independent of which map you’re on
-        max(1, linear.baseTargetFlips + totalFills * linear.incrementPerLevel)
-        
+        // Grows with the bar tier only (decoupled from unlocks by baseline).
+        max(1, linear.baseTargetFlips + barTier * linear.incrementPerLevel)
     }
     var progressFraction: Double {
         min(1.0, currentProgress / Double(currentBarTotal))
@@ -93,8 +102,8 @@ final class ProgressionManager: ObservableObject {
     static func standard() -> ProgressionManager {
         let tuning = ProgressTuning(p: 0.5, c: 1.7, gamma: 0.7)
 
-        // MARK: TUNE PROGRESSION
-        let linear = LinearConfig(baseTargetFlips: 40, incrementPerLevel: 10) //40 : 10
+        // MARK: TUNE PROGRESSION (v1.1)
+        let linear = LinearConfig(baseTargetFlips: 60, incrementPerLevel: 20)
 
         return ProgressionManager(tuning: tuning, linear: linear)
     }
@@ -109,6 +118,7 @@ final class ProgressionManager: ObservableObject {
         self.mapLocked  = UserDefaults.standard.object(forKey: Self.kMapLocked) as? Bool ?? false
         self.totalFills = UserDefaults.standard.integer(forKey: Self.kTotalFills)
         self.highestTileVisited = UserDefaults.standard.object(forKey: kHighestTileVisited) as? Int ?? 0
+        self.rebalanceBaselineFills = UserDefaults.standard.object(forKey: kBaselineFills_v110) as? Int ?? 0
 
         let didMigrate = UserDefaults.standard.bool(forKey: kDidMigrateUnlocks_v101)
         if !didMigrate {
@@ -133,6 +143,14 @@ final class ProgressionManager: ObservableObject {
             }
 
             UserDefaults.standard.set(true, forKey: kDidMigrateUnlocks_v101)
+        }
+        
+        // --- One-time difficulty rebalance for tokens (v1.1) ---
+        let didRebalance = UserDefaults.standard.bool(forKey: kDidRebalanceTokens_v110)
+        if !didRebalance {
+            // Snapshot current fills so bar difficulty restarts at tier 0 for everyone.
+            rebalanceBaselineFills = totalFills
+            UserDefaults.standard.set(true, forKey: kDidRebalanceTokens_v110)
         }
         
         // --- Self-heal: normalize saved progress against current target ---
@@ -186,6 +204,7 @@ final class ProgressionManager: ObservableObject {
     func debugResetUnlocks() {
         totalFills = 0          // starter-only unlocked (unlockedCount becomes 1)
         mapLocked  = false
+        rebalanceBaselineFills = 0
     }
     
     func registerBarFill() {
@@ -234,6 +253,11 @@ extension ProgressionManager {
         // Force migration to run on next init
         defaults.set(false, forKey: "didMigrateUnlocks_v101")
         defaults.synchronize()
+    }
+    /// Snapshot the current totalFills as the baseline so the bar tier resets to 0.
+    func debugRebalanceDifficultyNow() {
+        rebalanceBaselineFills = totalFills
+        UserDefaults.standard.set(true, forKey: kDidRebalanceTokens_v110)
     }
 }
 #endif

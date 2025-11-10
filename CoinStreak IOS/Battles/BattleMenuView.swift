@@ -33,7 +33,7 @@ struct BattleMenuView: View {
 
             ZStack {
                 // FULL-BLEED BACKGROUND (kills all white gutters)
-                Image("battles_menu_background")
+                Image("beta_battles_menu_background")
                     .resizable()
                     .scaledToFill()
                     .frame(width: W, height: H)

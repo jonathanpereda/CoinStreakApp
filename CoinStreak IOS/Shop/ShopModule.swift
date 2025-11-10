@@ -1,5 +1,80 @@
+
 import SwiftUI
 import UIKit
+import Foundation
+// Remote shop price overrides with simple ETag caching.
+// Reads/writes to UserDefaults and fetches from the backend on demand.
+enum RemoteShop {
+    private static let overridesKey = "shop.overrides.map.v1"
+    private static let etagKey      = "shop.overrides.etag.v1"
+    private static var loaded = false
+    private static var store: [String:[String:Int]] = [:]  // e.g. ["tables": ["woodcrate": 900]]
+
+    private static func loadFromDefaultsIfNeeded() {
+        guard !loaded else { return }
+        loaded = true
+        if let data = UserDefaults.standard.data(forKey: overridesKey),
+           let obj  = try? JSONSerialization.jsonObject(with: data) as? [String:[String:Int]] {
+            store = obj
+        }
+    }
+
+    static func price(for item: ShopItem) -> Int {
+        loadFromDefaultsIfNeeded()
+        let cat = (item.category == .coins) ? "coins" : "tables"
+        if let v = store[cat]?[item.id] { return v }
+        return item.price
+    }
+
+    @discardableResult
+    static func fetchIfNeeded(force: Bool = false) async -> String {
+        // Build URL from the same Worker base used elsewhere
+        let url = ScoreboardAPI.base.appendingPathComponent("/v1/shop/catalog")
+        var req = URLRequest(url: url)
+        // Only attach If-None-Match when not forcing; forcing guarantees a 200 with fresh body
+        if !force {
+            if let et = UserDefaults.standard.string(forKey: etagKey), !et.isEmpty {
+                req.addValue(et, forHTTPHeaderField: "If-None-Match")
+            }
+        }
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else {
+                return UserDefaults.standard.string(forKey: etagKey) ?? ""
+            }
+            if http.statusCode == 304 {
+                // Not modified
+                return UserDefaults.standard.string(forKey: etagKey) ?? ""
+            }
+            if http.statusCode == 200 {
+                // Parse: { version, updated_at, overrides: { coins:{...}, tables:{...} } }
+                let obj = try JSONSerialization.jsonObject(with: data) as? [String:Any]
+                let overridesObj = (obj?["overrides"] as? [String:Any]) ?? [:]
+                var map: [String:[String:Int]] = [:]
+                for (cat, v) in overridesObj {
+                    if let dict = v as? [String:Any] {
+                        var inner: [String:Int] = [:]
+                        for (k, anyVal) in dict {
+                            if let n = anyVal as? NSNumber { inner[k] = n.intValue }
+                            else if let s = anyVal as? String, let n = Int(s) { inner[k] = n }
+                        }
+                        map[cat] = inner
+                    }
+                }
+                store = map
+                let etag = http.value(forHTTPHeaderField: "ETag") ?? (obj?["version"] as? String ?? "")
+                if let dataToSave = try? JSONSerialization.data(withJSONObject: map) {
+                    UserDefaults.standard.set(dataToSave, forKey: overridesKey)
+                }
+                UserDefaults.standard.set(etag, forKey: etagKey)
+                return etag
+            }
+        } catch {
+            // Ignore network errors; keep existing cache
+        }
+        return UserDefaults.standard.string(forKey: etagKey) ?? ""
+    }
+}
 
 
 private final class TableThumbCache {
@@ -64,6 +139,7 @@ final class ShopVM: ObservableObject {
 
     // 2-second buy confirmation state
     @Published var confirmingItemId: String? = nil
+    private var confirmLockedPrice: [String:Int] = [:]
 
     // Owned IDs and per-category equip state
     @Published private(set) var owned: Set<String> = []
@@ -109,23 +185,35 @@ final class ShopVM: ObservableObject {
     func isEquipped(_ id: String, in cat: ShopCategory) -> Bool { equipped[cat] == id }
 
     // MARK: Confirm flow
-    func beginConfirm(for id: String, affordable: Bool) {
+    func beginConfirm(for id: String, affordable: Bool, lockPrice: Int) {
         guard affordable else { return }
         confirmingItemId = id
+        confirmLockedPrice[id] = lockPrice
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
             guard let self else { return }
-            if self.confirmingItemId == id { self.confirmingItemId = nil }
+            if self.confirmingItemId == id {
+                self.confirmingItemId = nil
+                self.confirmLockedPrice.removeValue(forKey: id)
+            }
         }
     }
-    func cancelConfirm() { confirmingItemId = nil }
+    func cancelConfirm() {
+        if let id = confirmingItemId {
+            confirmLockedPrice.removeValue(forKey: id)
+        }
+        confirmingItemId = nil
+    }
 
     // MARK: Purchase & Equip
     @discardableResult
     func purchase(_ item: ShopItem, tokenBalance: inout Int) -> Bool {
-        guard !owned.contains(item.id), tokenBalance >= item.price else { return false }
-        tokenBalance -= item.price
+        let priceToCharge = confirmLockedPrice[item.id] ?? RemoteShop.price(for: item)
+        guard !owned.contains(item.id), tokenBalance >= priceToCharge else { return false }
+        tokenBalance -= priceToCharge
         owned.insert(item.id)
         equipped[item.category] = item.id   // auto-equip after purchase
+        confirmingItemId = nil
+        confirmLockedPrice.removeValue(forKey: item.id)
         save()
         return true
     }
@@ -159,22 +247,26 @@ enum ShopCatalog {
         case .coins:
             return [
                 .init(id: "starter", category: .coins, title: "Starter", price: 0,   symbolName: "circle"),
-                .init(id: "silver",    category: .coins, title: "Silver",    price: 50, symbolName: "circle.fill"),
-                .init(id: "voxel",    category: .coins, title: "Voxel",    price: 50, symbolName: "circle.fill"),
-                .init(id: "chip",    category: .coins, title: "Chip",    price: 600, symbolName: "circle.fill"),
-                .init(id: "vinyl",    category: .coins, title: "Vinyl",    price: 50, symbolName: "circle.fill"),
-                .init(id: "cap",    category: .coins, title: "Cap",    price: 50, symbolName: "circle.fill"),
+                .init(id: "silver",    category: .coins, title: "Silver",    price: 650, symbolName: "circle.fill"),
+                .init(id: "voxel",    category: .coins, title: "Voxel",    price: 700, symbolName: "circle.fill"),
+                .init(id: "chip",    category: .coins, title: "Chip",    price: 1200, symbolName: "circle.fill"),
+                .init(id: "vinyl",    category: .coins, title: "Vinyl",    price: 1450, symbolName: "circle.fill"),
+                .init(id: "cap",    category: .coins, title: "Cap",    price: 1800, symbolName: "circle.fill"),
             ]
         case .tables:
             return [
                 .init(id: "starter",    category: .tables, title: "Starter",    price: 0,   symbolName: "rectangle.dashed"),
-                .init(id: "woodcrate",  category: .tables, title: "Wood Crate", price: 600, symbolName: "shippingbox"),
-                .init(id: "team",  category: .tables, title: "Team", price: 50, symbolName: "shippingbox"),
-                .init(id: "bamboo",  category: .tables, title: "Bamboo", price: 50, symbolName: "shippingbox"),
-                .init(id: "purple",     category: .tables, title: "Purple",     price: 650, symbolName: "rectangle.fill"),
-                .init(id: "picnic",     category: .tables, title: "Picnic",     price: 700, symbolName: "checkerboard.rectangle"),
-                .init(id: "disco",      category: .tables, title: "Disco",      price: 900, symbolName: "sparkles.rectangle.stack"),
-                .init(id: "blue",       category: .tables, title: "Blue",       price: 650, symbolName: "rectangle.portrait"),
+                .init(id: "blue",       category: .tables, title: "Blue",       price: 250, symbolName: "rectangle.portrait"),
+                .init(id: "orange",     category: .tables, title: "Orange",     price: 250, symbolName: "rectangle.fill"),
+                .init(id: "purple",     category: .tables, title: "Purple",     price: 300, symbolName: "rectangle.fill"),
+                .init(id: "team",  category: .tables, title: "Team", price: 400, symbolName: "shippingbox"),
+                .init(id: "picnic",     category: .tables, title: "Picnic",     price: 500, symbolName: "checkerboard.rectangle"),
+                .init(id: "rug",     category: .tables, title: "Rug",     price: 500, symbolName: "checkerboard.rectangle"),
+                .init(id: "bamboo",  category: .tables, title: "Bamboo", price: 500, symbolName: "shippingbox"),
+                .init(id: "disco",      category: .tables, title: "Disco",      price: 650, symbolName: "sparkles.rectangle.stack"),
+                .init(id: "tile",     category: .tables, title: "Tile",     price: 700, symbolName: "rectangle.fill"),
+                .init(id: "woodcrate",  category: .tables, title: "Wood Crate", price: 900, symbolName: "shippingbox"),
+                .init(id: "road",     category: .tables, title: "Road",     price: 1000, symbolName: "rectangle.fill"),
                 .init(id: "blackjack",  category: .tables, title: "Blackjack",  price: 1000, symbolName: "suit.club.fill")
             ]
         }
@@ -288,6 +380,7 @@ private struct ShopItemCell: View {
     let owned: Bool
     let equipped: Bool
     let confirming: Bool
+    let displayPrice: Int
     let onTap: () -> Void
     let onBuy: () -> Void
     
@@ -336,7 +429,7 @@ private struct ShopItemCell: View {
 
                 if !owned {
                     HStack(spacing: 6) {
-                        Text("\(item.price)")
+                        Text("\(displayPrice)")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white)
                         Image("tokens_icon")
@@ -352,7 +445,7 @@ private struct ShopItemCell: View {
             .padding(12)
             .padding(.top, 16)
         }
-        .frame(width: 180, height: 185)
+        .frame(width: 176, height: 185)
 
         return Button(action: onTap) { tile }
             .buttonStyle(.plain)
@@ -369,6 +462,7 @@ struct ShopOverlay: View {
     @Binding var equippedTableKey: String
     @Binding var equippedCoinKey: String
     let sideProvider: () -> String
+    @State private var overridesVersion: String = ""
 
     private var sx: CGFloat { max(1e-6, size.width / 1320.0) }
     private var sy: CGFloat { max(1e-6, size.height / 2868.0) }
@@ -383,7 +477,7 @@ struct ShopOverlay: View {
             // ITEM STRIP at x:248 y:962, size: 839×611
             itemStrip
                 .frame(width: 839 * sx, height: 450 * sy)
-                .position(x: (248 + 839/2) * sx, y: (1115 + 611/2) * sy)
+                .position(x: (248 + 839/2) * sx, y: (1120 + 611/2) * sy)
             
             // --- Top-right anchored wallet: grows LEFT from rightPx ---
             let rightPx: CGFloat = 1085   // was ~835 left + ~440 width; tweak if you move it
@@ -399,6 +493,10 @@ struct ShopOverlay: View {
         //.contentShape(Rectangle())
         //.allowsHitTesting(false)   // don't block flips
         //.zIndex(75)
+        .task {
+            // Fetch remote price overrides and trigger a refresh when ETag changes
+            overridesVersion = await RemoteShop.fetchIfNeeded()
+        }
     }
 
     private var wallet: some View {
@@ -488,11 +586,13 @@ struct ShopOverlay: View {
                         }
                         return nil
                     }()
+                    let displayPrice = RemoteShop.price(for: item)
                     ShopItemCell(
                         item: item,
                         owned: vm.isOwned(item.id),
                         equipped: vm.isEquipped(item.id, in: vm.selectedCategory),
                         confirming: vm.confirmingItemId == item.id,
+                        displayPrice: displayPrice,
                         onTap: {
                             if vm.isOwned(item.id) {
                                 vm.equip(item)
@@ -504,16 +604,17 @@ struct ShopOverlay: View {
                                     equippedCoinKey = item.id
                                 }
                             } else {
-                                let affordable = (tokenBalance >= item.price)
+                                let affordable = (tokenBalance >= displayPrice)
                                 if affordable {
-                                    vm.beginConfirm(for: item.id, affordable: true)
+                                    vm.beginConfirm(for: item.id, affordable: true, lockPrice: displayPrice)
                                 } else {
-                                    // TODO: deny haptic / sfx if desired
+                                    Haptics.shared.deny()
                                 }
                             }
                         },
                         onBuy: {
                             if vm.purchase(item, tokenBalance: &tokenBalance) {
+                                SoundManager.shared.play("spend_token")
                                 if item.category == .tables {
                                     equippedTableKey = item.id
                                     let side = sideProvider()

@@ -6,7 +6,7 @@ enum ScoreboardAPI {
     //#if targetEnvironment(simulator)
     //private static let base = URL(string: "http://127.0.0.1:8787")!
     //#else
-    private static let base = URL(string: "https://coinstreak-scoreboard.jonathanp.workers.dev")!
+    static let base = URL(string: "https://coinstreak-scoreboard.jonathanp.workers.dev")!
     //#endif
 
     struct RetireResponse: Decodable {
@@ -70,6 +70,25 @@ enum ScoreboardAPI {
             }
         } catch {
             print("register call failed: \(error.localizedDescription)")
+        }
+    }
+    
+    static func appOpened(installId: String) async -> Bool {
+        let url = base.appendingPathComponent("/v1/app/opened")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = ["installId": installId]
+        do {
+            req.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else { return false }
+            return (200...299).contains(http.statusCode)
+        } catch {
+            #if DEBUG
+            print("[ScoreboardAPI] appOpened error:", error)
+            #endif
+            return false
         }
     }
 }

@@ -17,6 +17,8 @@ struct ElevatorSwitcher<Below: View, Mid: View, Above: View>: View {
     var onOpenEnded: (() -> Void)? = nil
     var onCloseEnded: (() -> Void)? = nil
 
+    /// When a CLOSE finishes on Starter, decide if the "above doors" layer should reappear.
+    var shouldShowAboveAfterClose: () -> Bool = { true }
 
     // Tunables
     private let openDur: Double  = 1.20
@@ -49,6 +51,7 @@ struct ElevatorSwitcher<Below: View, Mid: View, Above: View>: View {
         @ViewBuilder belowDoors: @escaping () -> Below,
         @ViewBuilder midOverlay: @escaping () -> Mid = { EmptyView() },
         @ViewBuilder aboveDoors: @escaping () -> Above,
+        shouldShowAboveAfterClose: @escaping () -> Bool = { true },
         onOpenEnded: (() -> Void)? = nil,
         onCloseEnded: (() -> Void)? = nil,
         onCloseImpact: (() -> Void)? = nil,
@@ -63,6 +66,7 @@ struct ElevatorSwitcher<Below: View, Mid: View, Above: View>: View {
         self.belowDoors = belowDoors
         self.midOverlay = midOverlay
         self.aboveDoors = aboveDoors
+        self.shouldShowAboveAfterClose = shouldShowAboveAfterClose
         self.onOpenEnded = onOpenEnded
         self.onCloseEnded = onCloseEnded
         self.onCloseImpact = onCloseImpact
@@ -183,7 +187,7 @@ struct ElevatorSwitcher<Below: View, Mid: View, Above: View>: View {
                     withAnimation(closeAnim) { doorsOpen = false }
                     DispatchQueue.main.asyncAfter(deadline: .now() + closeDur) {
                         displayedBackwall = newName
-                        showAbove = true
+                        showAbove = shouldShowAboveAfterClose()
                         showBelow = false
                         onDoorImpact?(Date())
                         onCloseEnded?()

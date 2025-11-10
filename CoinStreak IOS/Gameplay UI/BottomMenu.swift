@@ -21,7 +21,7 @@ struct SquareHUDButton<Content: View>: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10)
-                .fill(.ultraThinMaterial.opacity(0.3))
+                .fill(.ultraThinMaterial.opacity(0.5))
                 .shadow(radius: 3)
 
             content

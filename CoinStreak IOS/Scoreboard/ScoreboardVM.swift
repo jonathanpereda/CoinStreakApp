@@ -11,6 +11,8 @@ final class ScoreboardVM: ObservableObject {
     @Published var headsTop: [LeaderboardEntryDTO] = []
     @Published var tailsTop: [LeaderboardEntryDTO] = []
 
+    private let leaderboardLimit = 10  // new app requests 10; old clients still default to 5 on server
+
     @Published var isOnline = true {
         didSet {
             if isOnline {
@@ -69,7 +71,7 @@ final class ScoreboardVM: ObservableObject {
     @MainActor
     func refresh(includeLeaderboard: Bool = false) async {
         do {
-            let url = ScoreboardAPI.scoreboardURL(includeLeaderboard: includeLeaderboard, limit: 5)
+            let url = ScoreboardAPI.scoreboardURL(includeLeaderboard: includeLeaderboard, limit: leaderboardLimit)
             let (data, resp) = try await URLSession.shared.data(from: url)
             guard (resp as? HTTPURLResponse)?.statusCode == 200 else {
                 throw URLError(.badServerResponse)

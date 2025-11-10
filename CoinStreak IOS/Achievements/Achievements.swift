@@ -4,6 +4,7 @@ import Foundation
 enum AchievementID: String, CaseIterable, Codable, Hashable {
     case highFlyer
     case nightowl
+    case rainyday
     case unlucky
     case _balanced
     case harmony
@@ -38,6 +39,13 @@ enum AchievementsCatalog {
             shortBlurb: "Flip the coin late at night",
             thumbName: "trophy_nightowl_thumb",
             silhouetteName: "trophy_nightowl_sil"
+        ),
+        .init(
+            id: .rainyday,
+            name: "Rainy Day",
+            shortBlurb: "Save up 2500 tokens",
+            thumbName: "trophy_rainyday_thumb",
+            silhouetteName: "trophy_rainyday_sil"
         ),
         .init(
             id: .unlucky,

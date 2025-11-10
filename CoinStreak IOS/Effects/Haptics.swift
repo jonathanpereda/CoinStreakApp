@@ -81,6 +81,35 @@ final class Haptics {
         guard isEnabled else { return }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
+
+    /// Firm, descending double‑tap “deny” for unavailable/locked actions.
+    /// Use when the user taps something they can't afford in the shop.
+    func deny() {
+        guard isEnabled else { return }
+
+        if supportsHaptics, let engine {
+            // Two quick knocks with a slight drop in intensity/sharpness → "nope"
+            let i1 = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.9)
+            let s1 = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.30)
+            let e1 = CHHapticEvent(eventType: .hapticTransient, parameters: [i1, s1], relativeTime: 0.0)
+
+            let i2 = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6)
+            let s2 = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.22)
+            let e2 = CHHapticEvent(eventType: .hapticTransient, parameters: [i2, s2], relativeTime: 0.08)
+
+            do {
+                let pattern = try CHHapticPattern(events: [e1, e2], parameters: [])
+                let player  = try engine.makePlayer(with: pattern)
+                try player.start(atTime: 0)
+            } catch {
+                // Fallback to system "error" feel
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        } else {
+            // Broadest fallback on devices without Core Haptics
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+        }
+    }
     
     /// Subtle gritty buzz for door **opening** (slightly ramps up)
     func scrapeOpen(duration: Double = 1.0) {

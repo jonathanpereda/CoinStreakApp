@@ -36,6 +36,7 @@ struct CoinStreak_IOSApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                //.dynamicTypeSize(.medium)
         }
     }
 }

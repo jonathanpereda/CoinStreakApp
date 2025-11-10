@@ -32,6 +32,7 @@ struct ContentView: View {
     
     @StateObject private var store = FlipStore()
     
+    
     // Score board stuff
     @State private var didRestorePhase = false
     @State private var didKickBootstrap = false
@@ -54,8 +55,11 @@ struct ContentView: View {
     @AppStorage("ach.progress.total_flips") private var totalFlips: Int = 0
     
     // TOKENS
-    private let TOKENS_PER_FILL = 1000
+    private let TOKENS_PER_FILL = 150
+    private let TOKENS_PER_STREAK = 25
     @AppStorage("tokens.balance") private var tokenBalance: Int = 0
+    @State private var showNewTokensToast: Bool = false
+    @State private var lastTokenGain: Int = 0
     
     //SHOP
     @StateObject private var shopVM = ShopVM()
@@ -103,6 +107,8 @@ struct ContentView: View {
     @State var bounceGen: Int = 0   // cancels any in-flight bounce sequence
     @State private var settleBounceT: Double = 1.0   // 0→1 drives bounce curve; 1 = idle
     @State private var currentFlipWasSuper = false
+    @AppStorage("pending.flip.outcome") private var pendingFlipOutcomeRaw: String = ""
+    @AppStorage("pending.flip.justApplied") private var pendingFlipJustApplied: Bool = false
 
 
     // App phase
@@ -223,6 +229,9 @@ struct ContentView: View {
                                 .opacity(counterOpacity)
                         }
                     },
+                    shouldShowAboveAfterClose: {
+                        !pendingEnterShopAfterClose
+                    },
                     onOpenEnded: {
                         if restoreCounterAfterOpen {
                             withAnimation(.easeInOut(duration: 0.25)) { counterOpacity = 1.0 }
@@ -257,6 +266,7 @@ struct ContentView: View {
                         if pendingEnterShopAfterClose {
                             pendingEnterShopAfterClose = false
                             withAnimation(.easeInOut(duration: 0.2)) { phase = .shop }
+                            switchToShopMusic()
                             return
                         }
 
@@ -264,6 +274,8 @@ struct ContentView: View {
                         if let idx = pendingExitShopToIndex {
                             // Allow streak to show again (we hid it only during the close)
                             suppressStreakUntilCloseEnds = false
+                            // Fade out shop loop; the OPEN will start the map loop via tier change
+                            SoundManager.shared.stopLoop(fadeOut: 0.4)
                             // Now OPEN to the previous map
                             pendingExitShopToIndex = nil
                             progression.jumpToLevelIndex(idx)     // starter → non-starter triggers OPEN
@@ -272,6 +284,7 @@ struct ContentView: View {
                             suppressStreakUntilCloseEnds = false
                             // Bring the streak back now that the doors are fully closed
                             withAnimation(.easeInOut(duration: 0.25)) { counterOpacity = 1.0 }
+                            switchToMapMusic()
                         }
 
                     }
@@ -739,8 +752,12 @@ struct ContentView: View {
                                         if musicMutedUI {
                                             SoundManager.shared.stopLoop(fadeOut: 0.4)
                                         } else {
-                                            let theme = tierTheme(for: progression.currentTierName)
-                                            updateTierLoop(theme)
+                                            if phase == .shop {
+                                                switchToShopMusic()
+                                            } else {
+                                                let theme = tierTheme(for: progression.currentTierName)
+                                                updateTierLoop(theme)
+                                            }
                                         }
                                     }
 
@@ -840,7 +857,7 @@ struct ContentView: View {
 
 
             // MARK: DEBUG BUTTONS
-            
+            /*
             #if DEBUG
             .overlay(alignment: .topLeading) {
                 VStack(spacing: 6) {
@@ -909,11 +926,23 @@ struct ContentView: View {
 
                     // ▶︎ Advance button
                     Button("▶︎") {
-                        func jumpToNextTier() {
+                        /*func jumpToNextTier() {
                             _ = progression.applyAward(len: 10_000)
                             progression.advanceTierAfterFill()
                         }
-                        jumpToNextTier()
+                        jumpToNextTier()*/
+                        //tokenBalance &+= TOKENS_PER_FILL
+                        // DEBUG: Clear all shop purchases and reset to starter equips so you can re-test pricing.
+                        //Wipe ownership/equips in the Shop VM and persist.
+                        /*shopVM.owned.removeAll()
+                        shopVM.equipped.removeAll()
+                        shopVM.save()
+                        //Reset equipped keys locally to "starter" and sync visuals.
+                        equippedTableKey = "starter"
+                        equippedCoinKey  = "starter"
+                        syncEquippedTableToFaceAndKey()
+                        syncEquippedCoinWithVM()*/
+
                     }
                     .font(.system(size: 14, weight: .semibold))
                     .padding(.horizontal, 10)
@@ -927,9 +956,12 @@ struct ContentView: View {
                 .padding(.leading, 8)
             }
             #endif
+            */
+            
+            
             
             .overlay { chooseOverlay(geo, groundY: groundY) }
-
+             
             
             // MARK: HERO DROP OVERLAY
             .overlay {
@@ -989,6 +1021,15 @@ struct ContentView: View {
         }
         // MARK: ON APPEAR
         .onAppear {
+            // Apply the last-used map's streak font immediately on cold start (before progression emits)
+            if let savedTier = UserDefaults.standard.string(forKey: "LastTierName") {
+                let savedTheme = tierTheme(for: savedTier)
+                fontBelowName = savedTheme.font
+                fontAboveName = savedTheme.font
+                lastTierName  = savedTier
+                // Keep loop music/backwall aligned as well
+                updateTierLoop(savedTheme)
+            }
             guard !didRestorePhase else {
                 updateTierLoop(tierTheme(for: progression.currentTierName)); return
             }
@@ -1021,8 +1062,16 @@ struct ContentView: View {
 
                         // state restore
                         if let state = await ScoreboardAPI.fetchState(installId: installId) {
-                            await MainActor.run { store.currentStreak = state.currentStreak }
-                            StreakSync.shared.seedAcked(to: state.currentStreak)
+                            await MainActor.run {
+                                if !pendingFlipJustApplied {
+                                    store.currentStreak = state.currentStreak
+                                }
+                            }
+                            // Seed acks from whatever we’re actually showing locally
+                            let ackVal = await MainActor.run { store.currentStreak }
+                            StreakSync.shared.seedAcked(to: ackVal)
+                            // Clear the one-shot guard after first reconciliation
+                            pendingFlipJustApplied = false
                         }
                     } else {
                         await MainActor.run {
@@ -1047,8 +1096,16 @@ struct ContentView: View {
                     await ScoreboardAPI.register(installId: installId, side: store.chosenFace!)
 
                     if let state = await ScoreboardAPI.fetchState(installId: installId) {
-                        await MainActor.run { store.currentStreak = state.currentStreak }
-                        StreakSync.shared.seedAcked(to: state.currentStreak)
+                        await MainActor.run {
+                            if !pendingFlipJustApplied {
+                                store.currentStreak = state.currentStreak
+                            }
+                        }
+                        // Seed acks from whatever we’re actually showing locally
+                        let ackVal = await MainActor.run { store.currentStreak }
+                        StreakSync.shared.seedAcked(to: ackVal)
+                        // Clear the one-shot guard after first reconciliation
+                        pendingFlipJustApplied = false
                     }
                 }
             }
@@ -1094,6 +1151,8 @@ struct ContentView: View {
             sfxMutedUI   = SoundManager.shared.isSfxMuted
             musicMutedUI = SoundManager.shared.isMusicMuted
             
+            let openId = InstallIdentity.getOrCreateInstallId()
+            Task { _ = await ScoreboardAPI.appOpened(installId: openId) }
         }
         
         // MARK: ON CHANGES
@@ -1127,18 +1186,44 @@ struct ContentView: View {
             }
 
             lastTierName = newName
+            UserDefaults.standard.set(newName, forKey: "LastTierName")
+        }
+        // Keep streak counter font/theme in sync on cold start restores where tierIndex may not emit
+        .onChange(of: progression.currentTierName) { _, newName in
+            guard newName != lastTierName else { return }          // avoid redundant updates
+            let theme = tierTheme(for: newName)
+            fontBelowName = theme.font
+            fontAboveName = theme.font
+            lastTierName  = newName
+            UserDefaults.standard.set(newName, forKey: "LastTierName")
+            updateTierLoop(theme)
         }
         .onChange(of: scenePhase) {_, newPhase in
             switch newPhase {
             case .active:
+                // Ensure streak font matches the last-used map upon returning active
+                if let savedTier = UserDefaults.standard.string(forKey: "LastTierName") {
+                    let theme = tierTheme(for: savedTier)
+                    fontBelowName = theme.font
+                    fontAboveName = theme.font
+                    if phase != .shop { updateTierLoop(theme) }
+                }
+                finalizePendingFlipIfPossible()
                 //Quick check if a battle happened
                 let id = InstallIdentity.getOrCreateInstallId()
+                Task { _ = await ScoreboardAPI.appOpened(installId: id) }
                 Task { await battleVM.pollForRevealIfNeeded(installId: id) }
                 // Refresh every 5s; includes leaderboard only when it's open
                 scoreboardVM.startPolling(includeLeaderboard: { isLeaderboardOpen })
                 // (Optional) immediate kick so LB shows right away if open
                 Task { await scoreboardVM.refresh(includeLeaderboard: isLeaderboardOpen) }
-            case .inactive, .background:
+            case .inactive:
+                // Commit any in-flight flip immediately when app becomes inactive (e.g., app switcher)
+                finalizePendingFlipIfPossible()
+                scoreboardVM.stopPolling()
+            case .background:
+                // Commit any in-flight flip when we enter background as well
+                finalizePendingFlipIfPossible()
                 scoreboardVM.stopPolling()
             @unknown default: break
             }
@@ -1231,8 +1316,40 @@ struct ContentView: View {
                 withAnimation(.easeIn(duration: 0.2)) { showBattleCinematic = true }
             }
         }
+        
+        .onChange(of: tokenBalance) { old, new in
+            guard new > old else { return }          // only on gains
+            lastTokenGain = new - old
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                showNewTokensToast = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                    showNewTokensToast = false
+                    
+                    // Rainy Day (have ≥ 2500 tokens at once)
+                    let rainyDayThreshold = 2500
+                    if !achievements.isUnlocked(.rainyday), new >= rainyDayThreshold {
+                        if achievements.unlock(.rainyday) {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                                showNewTrophyToast = true
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                                    showNewTrophyToast = false
+                                }
+                            }
+                            SoundManager.shared.play("trophy_unlock")
+                            Haptics.shared.success()
+                        }
+                    }
+                    
+                }
+            }
+        }
 
         .onChange(of: store.chosenFace) { _, _ in
+            finalizePendingFlipIfPossible()
             // Face shouldn’t change, but this keeps things future-proof
             syncEquippedTableToFaceAndKey()
             syncEquippedCoinWithVM()
@@ -1382,9 +1499,25 @@ struct ContentView: View {
     
     //SHOP HELPERS
     
+    // SHOP MUSIC HELPERS
+    private func switchToShopMusic() {
+        guard !musicMutedUI else { return }
+        SoundManager.shared.stopLoop(fadeOut: 0.4)
+        SoundManager.shared.startLoop(named: "shop_music", volume: 0.40, fadeIn: 0.8)
+    }
+
+    private func switchToMapMusic() {
+        guard !musicMutedUI else { return }
+        updateTierLoop(tierTheme(for: progression.currentTierName))
+    }
+    
     private func enterShop() {
         guard phase != .shop else { return }
         guard !isDoorsClosing else { return }
+
+        // Ensure latest remote price overrides before showing shop
+        Task { _ = await RemoteShop.fetchIfNeeded(force: true) }
+
         isDoorsOpening = true
 
         // Close panels
@@ -1402,6 +1535,7 @@ struct ContentView: View {
         if lastLevelIndexBeforeShop == 0 {
             // Starter (doors closed) → switch to shop and let OPEN run
             withAnimation(.easeInOut(duration: 0.2)) { phase = .shop }
+            switchToShopMusic()
         } else {
             // Non-starter (doors open) → CLOSE first (via Starter), then go to shop on close-end
             pendingEnterShopAfterClose = true
@@ -1425,7 +1559,6 @@ struct ContentView: View {
         if lastLevelIndexBeforeShop == 0 {
             // We want to end on Starter (doors closed). Force a CLOSE from shop → starter.
             withAnimation(.easeInOut(duration: 0.2)) { phase = .playing }
-            progression.jumpToLevelIndex(0)   // prev = shop_backwall (non-starter), new = starter → CLOSE
             pendingExitShopToIndex = nil
         } else {
             // We want to CLOSE to Starter then immediately OPEN to the previous non-starter.
@@ -1558,8 +1691,34 @@ struct ContentView: View {
         }
     }
 
-
     
+    
+    private func finalizePendingFlipIfPossible() {
+        guard !pendingFlipOutcomeRaw.isEmpty else { return }
+        guard let _ = store.chosenFace,
+              let faceVal = Face(rawValue: pendingFlipOutcomeRaw) else { return }
+
+        // Make the coin rest on the resolved outcome so UI matches reality
+        curState = pendingFlipOutcomeRaw
+        baseFaceAtLaunch = pendingFlipOutcomeRaw
+
+        // Record in Recent Flips via store API (avoids private setter issues)
+        store.recordFlip(result: faceVal)
+
+        // Mark that we updated locally this launch
+        pendingFlipJustApplied = true
+
+        // Push through the same offline/online sync path you already use
+        let installId = InstallIdentity.getOrCreateInstallId()
+        StreakSync.shared.handleLocalFlip(
+            installId: installId,
+            current: store.currentStreak,
+            isOnline: scoreboardVM.isOnline
+        )
+
+        // Clear pending
+        pendingFlipOutcomeRaw = ""
+    }
 
     // MARK: - FLIP LOGIC
     
@@ -1590,6 +1749,10 @@ struct ContentView: View {
         //let desired = "Tails"
         #endif
         
+        // Record this flip as pending so it's applied even if app is backgrounded/killed
+        if !visualOnly {
+            pendingFlipOutcomeRaw = desired
+        }
         
         //DEBUG USE ONLY
         //achievements.resetAll()
@@ -1655,6 +1818,10 @@ struct ContentView: View {
             withAnimation(.linear(duration: 0.70)) { settleBounceT = 1.0 }
             settleT = 0.0
             withAnimation(.linear(duration: 0.85)) { settleT = 1.0 }
+            // In shop (visual-only)
+            if visualOnly {
+                SoundManager.shared.play(["land_1","land_2"].randomElement()!)
+            }
             
             // If this was a “super” swipe, also do the dust burst + thud like hero drop
             if currentFlipWasSuper {
@@ -1677,8 +1844,8 @@ struct ContentView: View {
                 currentFlipWasSuper = false
             }
 
-            // (unchanged) streak / award / tier / SFX logic
-            if !visualOnly, let faceVal = Face(rawValue: desired) {
+            // streak / award / tier / SFX logic
+            if !visualOnly, let faceVal = Face(rawValue: desired), pendingFlipOutcomeRaw == desired {
                 let preStreak = store.currentStreak
                 let wasSuccess = (faceVal == store.chosenFace)
                 
@@ -1838,7 +2005,13 @@ struct ContentView: View {
                     if preStreak > 0 {
 
                         if preStreak >= 5 {
+                            
                             SoundManager.shared.play("boost_1")
+                            
+                            if preStreak >= 6 {
+                                tokenBalance &+= TOKENS_PER_STREAK
+                                SoundManager.shared.play(["earn_token_1","earn_token_2"].randomElement()!)
+                            }
                         }
 
                         // Current snapshot for the pulse
@@ -1897,6 +2070,7 @@ struct ContentView: View {
                                 
                                 // Award tokens per completed bar fill
                                 tokenBalance &+= TOKENS_PER_FILL
+                                SoundManager.shared.play(["earn_token_1","earn_token_2"].randomElement()!)
 
                                 // --- Only for LOCKED mode, clear the model *now* to avoid jitter ---
                                 if progression.mapLocked {
@@ -1940,6 +2114,8 @@ struct ContentView: View {
                     // Play landing sound
                     SoundManager.shared.play(["land_1","land_2"].randomElement()!)
                 }
+                
+                pendingFlipOutcomeRaw = ""
             }
         }
     }
@@ -2006,25 +2182,6 @@ private extension ContentView {
                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                 .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
                 
-                //SHOP button
-                Button {
-                    enterShop()
-                    Haptics.shared.tap()
-                } label: {
-                    SquareHUDButton(isOutlined: false) {
-                        Image(systemName: "storefront.fill")
-                            .resizable().scaledToFit()
-                            .frame(width: 22, height: 22)
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-                }
-                .buttonStyle(.plain)
-                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
-                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
-                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
-                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
-                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
-
                 // SETTINGS button
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
@@ -2046,29 +2203,21 @@ private extension ContentView {
                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                 .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
-
-                //Spacer(minLength: 0)
                 
-                // SCOREBOARD menu button
+                //SHOP button
                 Button {
-                    withAnimation(.easeInOut(duration: 0.22)) {
-                        if isScoreMenuOpen {
-                            isLeaderboardOpen = false
-                            isScoreMenuOpen = false
-                        } else {
-                            isScoreMenuOpen = true
-                        }
-                    }
+                    enterShop()
                     Haptics.shared.tap()
                 } label: {
-                    SquareHUDButton(isOutlined: isScoreMenuOpen) {
-                        Image("scoreboard_menu_icon")
-                            .resizable()
-                            .interpolation(.high)
-                            .scaledToFit()
-                            .frame(width: 25, height: 25)
-                            .opacity(0.8)
-                        }
+                    SquareHUDButton(
+                        isOutlined: showNewTokensToast,
+                        outlineColor: Color(red: 1.00, green: 0.85, blue: 0.20) // warm gold
+                    ) {
+                        Image(systemName: "storefront.fill")
+                            .resizable().scaledToFit()
+                            .frame(width: 22, height: 22)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
                 }
                 .buttonStyle(.plain)
                 .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
@@ -2076,7 +2225,8 @@ private extension ContentView {
                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                 .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
-                
+
+                //Spacer(minLength: 0)
                 
                 //BATTLES menu button
                 Button {
@@ -2087,12 +2237,10 @@ private extension ContentView {
                 } label: {
                     SquareHUDButton(isOutlined: false) {
                         ZStack(alignment: .topTrailing) {
-                            Image("battles_menu_icon")
-                                .resizable()
-                                .interpolation(.high)
-                                .scaledToFit()
-                                .frame(width: 22, height: 22)
-                                .opacity(0.8)
+                            Image(systemName: "flag.2.crossed.fill")
+                                .resizable().scaledToFit()
+                                .frame(width: 28, height: 28)
+                                .foregroundColor(.white.opacity(0.6))
 
                             if battleVM.hasAttention {
                                 Text("!")
@@ -2113,6 +2261,35 @@ private extension ContentView {
                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                 .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+                
+                // SCOREBOARD menu button
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        if isScoreMenuOpen {
+                            isLeaderboardOpen = false
+                            isScoreMenuOpen = false
+                        } else {
+                            isScoreMenuOpen = true
+                        }
+                    }
+                    Haptics.shared.tap()
+                } label: {
+                    SquareHUDButton(isOutlined: isScoreMenuOpen) {
+                        Image("scoreboard_menu_icon")
+                            .resizable()
+                            .interpolation(.high)
+                            .scaledToFit()
+                            .frame(width: 23, height: 23)
+                            .opacity(0.8)
+                        }
+                }
+                .buttonStyle(.plain)
+                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
+                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
+                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
+                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+                
                 
             }
 
@@ -2173,12 +2350,56 @@ private extension ContentView {
                     .allowsHitTesting(false)
                     .zIndex(999)
             }
+            
+            // === Tokens toast ===
+            if !anyBottomSheetOpen && showNewTokensToast {
+                HStack(spacing: 6) {
+                    Text("+ \(lastTokenGain)")
+                        .font(.system(size: 14, weight: .semibold))
+                        .monospacedDigit()                               // stable digit widths
+                    Image("tokens_icon")
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: 20, height: 20)
+                        .opacity(0.95)
+                }
+                .foregroundColor(.white.opacity(0.65))
+                .padding(.horizontal, 12)                                // inner horizontal padding
+                .frame(height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.09, green: 0.09, blue: 0.09, opacity: 0.10),
+                                    Color(red: 0.095, green: 0.095, blue: 0.095, opacity: 0.20)
+                                ],
+                                startPoint: .leading, endPoint: .trailing
+                            )
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+                .fixedSize(horizontal: true, vertical: false)            // <-- hug content width
+                .padding(.leading, 132)                                  // keep your existing placement
+                .offset(y: -31)
+                .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.5), value: showNewTokensToast)
+                .allowsHitTesting(false)
+                .zIndex(999)
+            }
         }
         .padding(.leading, 24)
         .padding(.trailing, 96)
         .padding(.bottom, 30)
         .opacity((phase != .choosing && phase != .shop) ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: phase)
+        
+        
     }
 }
 

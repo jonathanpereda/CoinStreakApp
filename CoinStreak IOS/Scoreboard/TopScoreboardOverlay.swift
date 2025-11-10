@@ -111,13 +111,30 @@ struct TopScoreboardOverlay: View {
                         .foregroundStyle(.red.opacity(0.5))*/
                 }
                 if isLeaderboardOpen {
+                    // Fixed viewport in design pixels (matches original static layout area).
+                    // Adjust these if your baked art changes.
+                    let listViewportOriginPx = CGPoint(x: 46, y: 272)   // top-left of list window inside leaderboard art
+                    let listViewportSizePx   = CGSize(width: 1200, height: 420)
+
+                    // Scale to points using the same 's' factor
+                    let vpW = listViewportSizePx.width * s
+                    let vpH = listViewportSizePx.height * s
+
+                    // Convert design-space origin to on-screen center position.
+                    // Leaderboard art’s top-left on screen is (-bleedX, lbY)
+                    let vpCenterX = (-bleedX) + listViewportOriginPx.x * s + vpW / 2
+                    let vpCenterY = lbY       + listViewportOriginPx.y * s + vpH / 2
+
                     LeaderboardContent(
                         heads: vm.headsTop,
                         tails: vm.tailsTop,
-                        streakColor: streakColor
+                        streakColor: streakColor,
+                        headsTint: headsFill,
+                        tailsTint: tailsFill
                     )
-                    .frame(width: geo.size.width)
-                    .offset(x: -bleedX, y: lbY + 64)
+                    .frame(width: vpW, height: vpH, alignment: .top)
+                    .clipped()
+                    .position(x: vpCenterX, y: vpCenterY)
                     .zIndex(20_000)
                     .allowsHitTesting(true)
                 }
@@ -299,32 +316,73 @@ private struct LeaderboardContent: View {
     let heads: [LeaderboardEntryDTO]
     let tails: [LeaderboardEntryDTO]
     let streakColor: (Int) -> Color
+    let headsTint: Color
+    let tailsTint: Color
     
     @State private var reportTarget: LeaderboardEntryDTO? = nil
     @State private var showReportConfirm: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 20) {
-                column(entries: heads, side: "H")
-                column(entries: tails, side: "T")
-            }
-            .padding(.top, 24)
-            .padding(.horizontal, 24)
+        GeometryReader { g in
+            // Compute a strict layout to keep both columns inside the viewport.
+            let totalW: CGFloat      = g.size.width
+            let edgeInset: CGFloat   = 6        // small L/R padding so text doesn’t touch edges
+            let interColGap: CGFloat = 12       // gap between the two columns
+            let usableW: CGFloat     = max(0, totalW - 2 * edgeInset - interColGap)
+            let colW: CGFloat        = usableW / 2
 
-            Spacer(minLength: 20)
+            ZStack {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(alignment: .top, spacing: interColGap) {
+                            // Left column (Heads)
+                            column(entries: heads, side: "H", colWidth: colW)
+                                .frame(width: colW, alignment: .leading)
+
+                            // Right column (Tails)
+                            column(entries: tails, side: "T", colWidth: colW)
+                                .frame(width: colW, alignment: .trailing)
+                        }
+                        .padding(.top, 4)
+                        .padding(.horizontal, edgeInset)
+                    }
+                    .foregroundColor(.white)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                .contentMargins(.vertical, 0, for: .scrollContent)
+                .animation(nil, value: heads.map(\.installId))
+                .animation(nil, value: tails.map(\.installId))
+
+                // Subtle top/bottom fade to hint scrollability (non-interactive)
+                VStack {
+                    LinearGradient(
+                        colors: [Color.black.opacity(0.18), Color.black.opacity(0.0)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    .frame(height: 16)
+                    .allowsHitTesting(false)
+
+                    Spacer()
+
+                    LinearGradient(
+                        colors: [Color.black.opacity(0.0), Color.black.opacity(0.18)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    .frame(height: 16)
+                    .allowsHitTesting(false)
+                }
+            }
+            .allowsHitTesting(true)
         }
-        .foregroundColor(.white)
-        .allowsHitTesting(true)
     }
 
     @ViewBuilder
-    private func column(entries: [LeaderboardEntryDTO], side: String) -> some View {
-        // Tune these once to fit your art
-        let rankW: CGFloat   = 30
-        let nameW: CGFloat   = 112   // widen a bit so names don’t force clipping
+    private func column(entries: [LeaderboardEntryDTO], side: String, colWidth: CGFloat) -> some View {
+        // Fixed widths for rank & streak; name width is computed to fit the column.
+        let rankW: CGFloat   = 40
         let streakW: CGFloat = 36
         let gap: CGFloat     = 2
+        let nameW: CGFloat   = max(60, colWidth - rankW - streakW - 2 * gap)
 
         VStack(alignment: .leading, spacing: 6) {
             if entries.isEmpty {
@@ -332,7 +390,6 @@ private struct LeaderboardContent: View {
             } else {
                 ForEach(Array(entries.enumerated()), id: \.element.installId) { idx, e in
                     HStack(alignment: .firstTextBaseline, spacing: gap) {
-
                         if side == "T" {
                             // Right column (Tails): STREAK → NAME → RANK
                             Text("\(e.currentStreak)")
@@ -341,6 +398,7 @@ private struct LeaderboardContent: View {
                                 .foregroundColor(streakColor(e.currentStreak))
                                 .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                                 .frame(width: streakW, alignment: .trailing)
+                                .lineLimit(1)
 
                             Button {
                                 reportTarget = e
@@ -353,24 +411,42 @@ private struct LeaderboardContent: View {
                                     .opacity(0.92)
                                     .frame(width: nameW, alignment: .trailing)
                                     .contentShape(Rectangle())
-                                    //.background(Color.red.opacity(0.5))
                             }
                             .buttonStyle(.plain)
-
 
                             Text("[\(idx + 1)]")
                                 .font(.system(size: 14, weight: .bold))
                                 .monospacedDigit()
+                                .lineLimit(1)
                                 .opacity(0.75)
                                 .frame(width: rankW, alignment: .trailing)
+                                .overlay(
+                                    Text("[\(idx + 1)]")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .monospacedDigit()
+                                        .lineLimit(1)
+                                        .foregroundStyle(tailsTint)
+                                        .opacity(0.22)
+                                        .frame(width: rankW, alignment: .trailing)
+                                )
 
                         } else {
                             // Left column (Heads): RANK → NAME → STREAK
                             Text("[\(idx + 1)]")
                                 .font(.system(size: 14, weight: .bold))
                                 .monospacedDigit()
+                                .lineLimit(1)
                                 .opacity(0.75)
                                 .frame(width: rankW, alignment: .leading)
+                                .overlay(
+                                    Text("[\(idx + 1)]")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .monospacedDigit()
+                                        .lineLimit(1)
+                                        .foregroundStyle(headsTint)
+                                        .opacity(0.22)
+                                        .frame(width: rankW, alignment: .leading)
+                                )
 
                             Button {
                                 reportTarget = e
@@ -383,7 +459,6 @@ private struct LeaderboardContent: View {
                                     .opacity(0.92)
                                     .frame(width: nameW, alignment: .leading)
                                     .contentShape(Rectangle())
-                                    //.background(Color.red.opacity(0.5))
                             }
                             .buttonStyle(.plain)
 
@@ -393,19 +468,19 @@ private struct LeaderboardContent: View {
                                 .foregroundColor(streakColor(e.currentStreak))
                                 .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                                 .frame(width: streakW, alignment: .leading)
+                                .lineLimit(1)
                         }
                     }
                     .padding(.vertical, 2)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(alignment: .topLeading)
         .alert("Report this name?", isPresented: $showReportConfirm) {
             Button("Cancel", role: .cancel) { }
             Button("Report", role: .destructive) {
                 guard let t = reportTarget else { return }
                 let reporter = InstallIdentity.getOrCreateInstallId()
-                // fire-and-forget; dismiss the alert immediately
                 Task {
                     _ = await ScoreboardAPI.reportName(
                         reporterInstallId: reporter,
@@ -423,6 +498,5 @@ private struct LeaderboardContent: View {
                 Text("")
             }
         }
-
     }
 }
