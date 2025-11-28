@@ -59,6 +59,10 @@ struct ChooseFaceScreen: View {
     let screenSize: CGSize
     let onSelection: (Face) -> Void   // selection callback to ContentView
 
+    // Live player counts to show above each coin
+    @State private var headsCount: Int? = nil
+    @State private var tailsCount: Int? = nil
+
     // Match main game’s layout constants so placement feels consistent
     private let coinDiameterPctMain: CGFloat = 0.565
     private let coinRestOverlapPct: CGFloat = 0.06
@@ -70,7 +74,7 @@ struct ChooseFaceScreen: View {
     private let chooseSpacingMultiplier: CGFloat = 0    // horizontal gap = coinD * this
     private let shadowYOffsetTweakChoose: CGFloat = -10   // per-screen nudge (pts)
     private let coinsXOffset: CGFloat = 0               // move both coins left/right
-    private let coinsYOffset: CGFloat = -50             // move both coins up/down
+    private let coinsYOffset: CGFloat = -80             // move both coins up/down
 
     var body: some View {
         let W = screenSize.width
@@ -109,31 +113,44 @@ struct ChooseFaceScreen: View {
             let pairHeight = coinD * 1.6
 
             HStack(spacing: spacing) {
-                PickableCoin(
-                    face: .Heads,
-                    coinD: coinD,
-                    centerY: coinCenterY,
-                    groundY: groundY,
-                    scaleFactor: scaleFactor,
-                    isLeftCoin: true,
-                    shadowYOffsetTweakChoose: shadowYOffsetTweakChoose
-                ) { choose($0) }
+                VStack(spacing: 6) {
+                    if let c = headsCount {
+                        CountBubble(text: "\(c)")
+                            .padding(.bottom, 2)
+                    }
+                    PickableCoin(
+                        face: .Heads,
+                        coinD: coinD,
+                        centerY: coinCenterY,
+                        groundY: groundY,
+                        scaleFactor: scaleFactor,
+                        isLeftCoin: true,
+                        shadowYOffsetTweakChoose: shadowYOffsetTweakChoose
+                    ) { choose($0) }
+                }
 
-                PickableCoin(
-                    face: .Tails,
-                    coinD: coinD,
-                    centerY: coinCenterY,
-                    groundY: groundY,
-                    scaleFactor: scaleFactor,
-                    isLeftCoin: false,
-                    shadowYOffsetTweakChoose: shadowYOffsetTweakChoose
-                ) { choose($0) }
+                VStack(spacing: 6) {
+                    if let c = tailsCount {
+                        CountBubble(text: "\(c)")
+                            .padding(.bottom, 2)
+                    }
+                    PickableCoin(
+                        face: .Tails,
+                        coinD: coinD,
+                        centerY: coinCenterY,
+                        groundY: groundY,
+                        scaleFactor: scaleFactor,
+                        isLeftCoin: false,
+                        shadowYOffsetTweakChoose: shadowYOffsetTweakChoose
+                    ) { choose($0) }
+                }
             }
             .frame(width: pairWidth, height: pairHeight, alignment: .center)
             .position(x: W/2 + coinsXOffset, y: coinCenterY + coinsYOffset + 15)
         }
         .ignoresSafeArea()
         .statusBarHidden(true)
+        .task { await fetchPlayerCounts() }
     }
 
     private func choose(_ selected: Face) {
@@ -141,6 +158,33 @@ struct ChooseFaceScreen: View {
         withAnimation(.easeInOut(duration: 0.35)) {
             onSelection(selected)
         }
+    }
+
+    private func fetchPlayerCounts() async {
+        if let totals = await ScoreboardAPI.fetchTotals() {
+            await MainActor.run {
+                self.headsCount = totals.headsCount ?? 0
+                self.tailsCount  = totals.tailsCount  ?? 0
+            }
+        }
+    }
+}
+
+//player count badge
+private struct CountBubble: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .font(.system(size: 14, weight: .semibold, design: .rounded))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Color.white.opacity(0.92))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.black.opacity(0.12), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.12), radius: 4, x: 0, y: 2)
     }
 }
 

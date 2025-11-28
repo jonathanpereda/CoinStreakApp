@@ -857,8 +857,8 @@ struct ContentView: View {
 
 
             // MARK: DEBUG BUTTONS
-            /*
-            #if DEBUG
+            
+            #if TRAILER
             .overlay(alignment: .topLeading) {
                 VStack(spacing: 6) {
                     // ⬅︎ Reset button
@@ -926,6 +926,12 @@ struct ContentView: View {
 
                     // ▶︎ Advance button
                     Button("▶︎") {
+                        // Jump into the choose-face phase so we can visually inspect that screen.
+                        // We leave all persistent identity / streak state alone.
+                        /*withAnimation(.easeInOut(duration: 0.25)) {
+                            phase = .choosing
+                            gameplayOpacity = 0     // hide live gameplay coin while in choose-face
+                        }*/
                         /*func jumpToNextTier() {
                             _ = progression.applyAward(len: 10_000)
                             progression.advanceTierAfterFill()
@@ -956,7 +962,7 @@ struct ContentView: View {
                 .padding(.leading, 8)
             }
             #endif
-            */
+            
             
             
             

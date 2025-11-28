@@ -44,7 +44,7 @@ struct IntroOverlay: View {
         // Use scaled radius for the “rest” center, then add the global coin nudge later
         let coinCenterY_atRest = groundY - coinR * (1 - coinRestOverlapPct)
 
-        let faceImageName = (finalFace == .Tails) ? "coin_T" : "coin_H"
+        let faceImageName = (finalFace == .Tails) ? "starter_coin_T" : "starter_coin_H"
 
 
         ZStack {
