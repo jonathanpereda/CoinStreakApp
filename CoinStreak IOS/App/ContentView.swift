@@ -85,6 +85,14 @@ struct ContentView: View {
     @State private var lastUnlockedCount = 1   // starter = 1
     @State private var showCycleHint = false
     @State private var cycleHintText = "Cycle: On"
+    
+    //More Menu
+    @State private var isMoreOpen = false
+    
+    //Stats Menu
+    @State private var isStatsOpen = false
+    @StateObject private var stats = StatsStore()
+    
 
     @State private var curState = "Heads"
 
@@ -349,7 +357,7 @@ struct ContentView: View {
                         .onChange(of: progression.tierIndex) { _, _ in
                             barPulse = nil
                         }
-                        .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
+                        .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen) ? 0 : 1)
                         .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                         .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                         .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
@@ -379,6 +387,7 @@ struct ContentView: View {
                         if showShopUI {
                             ShopOverlay(
                                 vm: shopVM,
+                                stats: stats,
                                 tokenBalance: $tokenBalance,
                                 size: geo.size,
                                 equippedTableImage: $equippedTableImage,
@@ -1159,6 +1168,9 @@ struct ContentView: View {
             
             let openId = InstallIdentity.getOrCreateInstallId()
             Task { _ = await ScoreboardAPI.appOpened(installId: openId) }
+            
+            // Seed StatsStore from pre-existing data (only runs once).
+            runStatsBackfillIfNeeded()
         }
         
         // MARK: ON CHANGES
@@ -1370,6 +1382,38 @@ struct ContentView: View {
 
 
         
+        // STATS OVERLAY (shows game behind)
+        .overlay {
+            if isStatsOpen {
+                ZStack {
+                    // Dimming background over the game, but still partially see-through
+                    Color.black.opacity(0.55)
+                        .ignoresSafeArea()
+
+                    let allAchievements = AchievementsCatalog.all
+                    let unlockedTrophies = allAchievements.filter { ach in
+                        achievements.isUnlocked(ach.id)
+                    }.count
+
+                    let mapItems = makeMapItems(progression)
+                    let totalMaps = mapItems.count
+                    let unlockedMaps = progression.unlockedCount
+
+                    StatsMenuView(
+                        isOpen: $isStatsOpen,
+                        stats: stats,
+                        unlockedTrophies: unlockedTrophies,
+                        totalTrophies: allAchievements.count,
+                        unlockedMaps: unlockedMaps,
+                        totalMaps: totalMaps,
+                        onBackfill: { runStatsBackfillIfNeeded() }
+                    )
+                    .transition(.opacity)
+                }
+                .zIndex(500)
+            }
+        }
+
         .fullScreenCover(isPresented: $isBattleMenuOpen, onDismiss: {
             // no-op
         }) {
@@ -1503,6 +1547,72 @@ struct ContentView: View {
 
     }
     
+    // MARK: - Stats Backfill
+
+    /// One-time seeding of StatsStore from legacy data so players don't start from 0
+    private func runStatsBackfillIfNeeded() {
+        // 1) Legacy flips come from the existing totalFlips counter
+        //    that you already use for Steady / Dedicated / Devoted.
+        let legacyFlips = totalFlips
+
+        var legacyHeads: Int? = nil
+        var legacyTails: Int? = nil
+        if legacyFlips > 0 {
+            let h = legacyFlips / 2
+            legacyHeads = h
+            legacyTails = legacyFlips - h
+        }
+
+        var legacyLongest: Int? = nil
+        if achievements.isUnlocked(.unlucky) {
+            legacyLongest = 10
+        }
+
+        let legacySpent = computeLegacyTokensSpent()
+        let legacyEarned = legacySpent.map { $0 + tokenBalance }
+        
+        //print("[StatsBackfill] flips=\(legacyFlips), heads=\(legacyHeads ?? -1), tails=\(legacyTails ?? -1), longest=\(legacyLongest ?? -1), spent=\(legacySpent ?? -1), earned=\(legacyEarned ?? -1), tokenBalance=\(tokenBalance)")
+
+
+        stats.backfillIfNeeded(
+            legacyTotalFlips: legacyFlips,
+            legacyHeads: legacyHeads,
+            legacyTails: legacyTails,
+            legacyLongestLosingStreak: legacyLongest,
+            legacyTokensEarned: legacyEarned,
+            legacyTokensSpent: legacySpent
+        )
+    }
+
+    /// Compute how many tokens have already been spent on shop items,
+    /// based on the current owned set and the canonical catalog.
+    ///
+    /// We iterate all catalog items, check whether the player owns them,
+    /// and sum the remote-adjusted price (ignoring any free items like "starter").
+    private func computeLegacyTokensSpent() -> Int? {
+        var total = 0
+
+        for category in ShopCategory.allCases {
+            let items = ShopCatalog.items(for: category)
+            for item in items {
+                // Only count items the player actually owns
+                guard shopVM.isOwned(item.id) else { continue }
+
+                // Use the same pricing logic as purchases (respects RemoteShop overrides)
+                let price = RemoteShop.price(for: item)
+
+                // Skip free items (e.g. starter cosmetics)
+                guard price > 0 else { continue }
+
+                total += price
+            }
+        }
+
+        return total
+    }
+    
+    
+    
     //SHOP HELPERS
     
     // SHOP MUSIC HELPERS
@@ -1531,6 +1641,7 @@ struct ContentView: View {
         isSettingsOpen = false
         isTrophiesOpen = false
         isBattleMenuOpen = false
+        isMoreOpen = false
 
         // Remember where we were
         lastLevelIndexBeforeShop = currentTileIndex()
@@ -1855,6 +1966,10 @@ struct ContentView: View {
                 let preStreak = store.currentStreak
                 let wasSuccess = (faceVal == store.chosenFace)
                 
+                //Flip Stats
+                let isHeads = (faceVal == .Heads)
+                stats.recordFlip(isHeads: isHeads, isCorrect: wasSuccess)
+                
                 // === UNLUCKY (10 wrong in a row) tracker ===
                 if !achievements.isUnlocked(.unlucky) {
                     if wasSuccess {
@@ -2016,6 +2131,7 @@ struct ContentView: View {
                             
                             if preStreak >= 6 {
                                 tokenBalance &+= TOKENS_PER_STREAK
+                                stats.addTokensEarned(TOKENS_PER_STREAK)
                                 SoundManager.shared.play(["earn_token_1","earn_token_2"].randomElement()!)
                             }
                         }
@@ -2076,6 +2192,7 @@ struct ContentView: View {
                                 
                                 // Award tokens per completed bar fill
                                 tokenBalance &+= TOKENS_PER_FILL
+                                stats.addTokensEarned(TOKENS_PER_FILL)
                                 SoundManager.shared.play(["earn_token_1","earn_token_2"].randomElement()!)
 
                                 // --- Only for LOCKED mode, clear the model *now* to avoid jitter ---
@@ -2136,7 +2253,7 @@ private extension ContentView {
         ZStack(alignment: .leading) {
 
             var anyBottomSheetOpen: Bool {
-                isMapSelectOpen || isSettingsOpen || isTrophiesOpen
+                isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen
             }
 
             // === Buttons row (Map + Settings + Trophy + Scoreboard) ===
@@ -2144,9 +2261,17 @@ private extension ContentView {
                 // MAP button
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
-                        if isSettingsOpen { isSettingsOpen = false }
-                        else if isTrophiesOpen { isTrophiesOpen = false }
-                        else { isMapSelectOpen.toggle() }
+                        if isMapSelectOpen {
+                            isMapSelectOpen = false
+                        } else if isSettingsOpen {
+                            isSettingsOpen = false
+                        } else if isTrophiesOpen {
+                            isTrophiesOpen = false
+                        } else if isMoreOpen {
+                            isMoreOpen = false
+                        } else {
+                            isMapSelectOpen = true
+                        }
                     }
                     Haptics.shared.tap()
                 } label: {
@@ -2167,6 +2292,7 @@ private extension ContentView {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                         if isMapSelectOpen { isMapSelectOpen = false }
                         if isSettingsOpen { isSettingsOpen = false }
+                        if isMoreOpen { isMoreOpen = false }
                         isTrophiesOpen.toggle()
                     }
                     Haptics.shared.tap()
@@ -2182,33 +2308,45 @@ private extension ContentView {
                     }
                 }
                 .buttonStyle(.plain)
-                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
-                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
+                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen) ? 0 : 1)
+                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen)
                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                 .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+                .animation(.easeInOut(duration: 0.2), value: isMoreOpen)
                 
-                // SETTINGS button
+                // MORE button
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
-                        if isMapSelectOpen { isMapSelectOpen = false }
-                        isSettingsOpen.toggle()
+                        let new = !isMoreOpen
+                        // Close other panels when toggling More
+                        isMapSelectOpen = false
+                        isSettingsOpen = false
+                        isTrophiesOpen = false
+                        isBattleMenuOpen = false
+                        isMoreOpen = new
                     }
                     Haptics.shared.tap()
                 } label: {
                     SquareHUDButton(isOutlined: false) {
-                        Image(systemName: "gearshape.fill")
-                            .resizable().scaledToFit()
-                            .frame(width: 22, height: 22)
-                            .foregroundColor(.white.opacity(0.6))
+                        VStack(spacing: 4) {
+                            Capsule()
+                                .frame(width: 18, height: 3)
+                            Capsule()
+                                .frame(width: 18, height: 3)
+                            Capsule()
+                                .frame(width: 18, height: 3)
+                        }
+                        .foregroundColor(.white.opacity(0.6))
                     }
                 }
                 .buttonStyle(.plain)
-                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
-                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
+                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen) ? 0 : 1)
+                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen)
                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                 .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+                .animation(.easeInOut(duration: 0.2), value: isMoreOpen)
                 
                 //SHOP button
                 Button {
@@ -2226,16 +2364,17 @@ private extension ContentView {
                     }
                 }
                 .buttonStyle(.plain)
-                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
-                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
+                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen) ? 0 : 1)
+                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen)
                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                 .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+                .animation(.easeInOut(duration: 0.2), value: isMoreOpen)
 
                 //Spacer(minLength: 0)
                 
                 //BATTLES menu button
-                Button {
+                /*Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                         isBattleMenuOpen = true
                     }
@@ -2266,7 +2405,7 @@ private extension ContentView {
                 .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
-                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)*/
                 
                 // SCOREBOARD menu button
                 Button {
@@ -2290,12 +2429,12 @@ private extension ContentView {
                         }
                 }
                 .buttonStyle(.plain)
-                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen) ? 0 : 1)
-                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen)
+                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen) ? 0 : 1)
+                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen)
                 .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                 .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                 .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
-                
+                .animation(.easeInOut(duration: 0.2), value: isMoreOpen)
                 
             }
 
@@ -2398,6 +2537,8 @@ private extension ContentView {
                 .allowsHitTesting(false)
                 .zIndex(999)
             }
+            
+            
         }
         .padding(.leading, 24)
         .padding(.trailing, 96)
@@ -2405,7 +2546,86 @@ private extension ContentView {
         .opacity((phase != .choosing && phase != .shop) ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: phase)
         
-        
+        // MARK: - MORE MENU WINDOW
+        if isMoreOpen {
+
+            VStack {
+                Spacer()
+                HStack(alignment: .center, spacing: 12) {
+
+                    // Reserve the X area; don't intercept taps here
+                    Spacer()
+                        .frame(width: 46)
+                        .allowsHitTesting(false)
+
+                    // MORE carousel
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            // SETTINGS tile
+                            SettingsTile(size: 90, label: "Settings") {
+                                ZStack {
+                                    Image(systemName: "gearshape.fill")
+                                        .font(.system(size: 90 * 0.34, weight: .semibold))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                            }
+                            .onTapGesture {
+                                Haptics.shared.tap()
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    isMoreOpen = false
+                                    isSettingsOpen = true
+                                }
+                            }
+                            
+                            // STATS tile
+                            SettingsTile(size: 90, label: "Stats") {
+                                ZStack {
+                                    Image(systemName: "chart.bar.xaxis")
+                                        .font(.system(size: 90 * 0.34, weight: .semibold))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                            }
+                            .onTapGesture {
+                                Haptics.shared.tap()
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    isMoreOpen = false
+                                    isStatsOpen = true
+                                }
+                            }
+
+                            // BATTLES tile
+                            SettingsTile(size: 90, label: "Battles") {
+                                ZStack {
+                                    Image(systemName: "flag.and.flag.filled.crossed")
+                                        .font(.system(size: 90 * 0.34, weight: .semibold))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                            }
+                            .onTapGesture {
+                                Haptics.shared.tap()
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    isMoreOpen = false
+                                    isBattleMenuOpen = true
+                                }
+                            }
+
+
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.trailing, 8)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 96)
+                    .offset(y: 24)
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
+                .frame(maxWidth: .infinity)
+                .frame(height: min(180, UIScreen.main.bounds.height * 0.22))
+            }
+            .ignoresSafeArea(edges: .bottom)
+        }
+
     }
 }
 

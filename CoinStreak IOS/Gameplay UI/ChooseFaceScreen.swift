@@ -74,8 +74,12 @@ struct ChooseFaceScreen: View {
     private let chooseSpacingMultiplier: CGFloat = 0    // horizontal gap = coinD * this
     private let shadowYOffsetTweakChoose: CGFloat = -10   // per-screen nudge (pts)
     private let coinsXOffset: CGFloat = 0               // move both coins left/right
-    private let coinsYOffset: CGFloat = -80             // move both coins up/down
-
+    private let coinsYOffset: CGFloat = -50             // move both coins up/down
+    
+    private let headsTint = Color(hex: "#8BAAD9")
+    private let tailsTint = Color(hex: "#D98D8B")
+    
+    
     var body: some View {
         let W = screenSize.width
         let H = screenSize.height
@@ -111,13 +115,11 @@ struct ChooseFaceScreen: View {
             let spacing = coinD * chooseSpacingMultiplier
             let pairWidth = coinD * 2 + spacing
             let pairHeight = coinD * 1.6
+            let coinsCenterY = coinCenterY + coinsYOffset + 15
 
+            // Coins row + players ratio bar underneath
             HStack(spacing: spacing) {
                 VStack(spacing: 6) {
-                    if let c = headsCount {
-                        CountBubble(text: "\(c)")
-                            .padding(.bottom, 2)
-                    }
                     PickableCoin(
                         face: .Heads,
                         coinD: coinD,
@@ -130,10 +132,6 @@ struct ChooseFaceScreen: View {
                 }
 
                 VStack(spacing: 6) {
-                    if let c = tailsCount {
-                        CountBubble(text: "\(c)")
-                            .padding(.bottom, 2)
-                    }
                     PickableCoin(
                         face: .Tails,
                         coinD: coinD,
@@ -146,7 +144,44 @@ struct ChooseFaceScreen: View {
                 }
             }
             .frame(width: pairWidth, height: pairHeight, alignment: .center)
-            .position(x: W/2 + coinsXOffset, y: coinCenterY + coinsYOffset + 15)
+            .position(x: W/2 + coinsXOffset, y: coinsCenterY)
+
+            // Player-count bar under the coins (same concept as top scoreboard bar, but using player counts)
+            if let h = headsCount, let t = tailsCount {
+                let barHeight = coinD * 0.24
+                VStack(spacing: 4) {
+                    // Side labels above the bar
+                    HStack {
+                        Text("HEADS")
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(headsTint.opacity(0.8))
+                            .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Text("TAILS")
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(tailsTint.opacity(0.8))
+                            .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+
+                    PlayersRatioBar(
+                        headsPlayers: h,
+                        tailsPlayers: t
+                    )
+                    .frame(height: barHeight)
+
+                    Text("Player count")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.white.opacity(0.85))
+                        .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
+                }
+                .frame(width: pairWidth * 1.2)
+                .position(
+                    x: W/2 + coinsXOffset,
+                    y: coinsCenterY + pairHeight / 2 + barHeight / 2 + 18
+                )
+            }
         }
         .ignoresSafeArea()
         .statusBarHidden(true)
@@ -170,21 +205,65 @@ struct ChooseFaceScreen: View {
     }
 }
 
-//player count badge
-private struct CountBubble: View {
-    let text: String
+
+// Player-count ratio bar (mirrors the top scoreboard bar but uses player counts)
+private struct PlayersRatioBar: View {
+    let headsPlayers: Int
+    let tailsPlayers: Int
+    
+    private let headsFill = Color(hex: "#3C7DC0")
+    private let tailsFill = Color(hex: "#C02A2B")
+
     var body: some View {
-        Text(text)
-            .font(.system(size: 14, weight: .semibold, design: .rounded))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Color.white.opacity(0.92))
+        GeometryReader { geo in
+            let barW = geo.size.width
+            let barH = geo.size.height
+
+            let heads = max(0, headsPlayers)
+            let tails = max(0, tailsPlayers)
+            let sum   = heads + tails
+            let hFrac: CGFloat = (sum == 0) ? 0.5 : CGFloat(heads) / CGFloat(sum)
+            let leftW  = barW * hFrac
+            let rightW = barW - leftW
+            let barCorner = barH * 0.45
+
+            ZStack(alignment: .leading) {
+                // Left (heads) segment
+                Rectangle()
+                    .fill(headsFill)
+                    .frame(width: leftW, height: barH)
+
+                // Right (tails) segment
+                Rectangle()
+                    .fill(tailsFill)
+                    .frame(width: rightW, height: barH)
+                    .offset(x: leftW)
+
+                // Centered labels in each segment
+                GeometryReader { g in
+                    let leftCenterX  = max(0, min(leftW,  g.size.width)) / 2
+                    let rightCenterX = leftW + max(0, min(rightW, g.size.width)) / 2
+
+                    Text("\(heads)")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                        .position(x: leftCenterX, y: g.size.height / 2)
+
+                    Text("\(tails)")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                        .position(x: rightCenterX, y: g.size.height / 2)
+                }
+            }
+            .frame(width: barW, height: barH)
+            .clipShape(RoundedRectangle(cornerRadius: barCorner, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                RoundedRectangle(cornerRadius: barCorner, style: .continuous)
+                    .stroke(Color.black.opacity(0.20), lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.12), radius: 4, x: 0, y: 2)
+        }
     }
 }
 

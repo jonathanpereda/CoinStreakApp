@@ -455,6 +455,7 @@ private struct ShopItemCell: View {
 /// All shop overlay UI lives here (wallet now; categories/items later)
 struct ShopOverlay: View {
     @ObservedObject var vm: ShopVM
+    @ObservedObject var stats: StatsStore
     @Binding var tokenBalance: Int
     let size: CGSize
 
@@ -614,6 +615,8 @@ struct ShopOverlay: View {
                         },
                         onBuy: {
                             if vm.purchase(item, tokenBalance: &tokenBalance) {
+                                // Track tokens spent for stats
+                                stats.addTokensSpent(displayPrice)
                                 SoundManager.shared.play("spend_token")
                                 if item.category == .tables {
                                     equippedTableKey = item.id
