@@ -10,9 +10,6 @@
 		A41B99722E93602900D7059D /* Beirut.ttc in Resources */ = {isa = PBXBuildFile; fileRef = A41B99712E93602900D7059D /* Beirut.ttc */; };
 		A41B99732E93602900D7059D /* Beirut.ttc in Resources */ = {isa = PBXBuildFile; fileRef = A41B99712E93602900D7059D /* Beirut.ttc */; };
 		A41B99742E93602900D7059D /* Beirut.ttc in Resources */ = {isa = PBXBuildFile; fileRef = A41B99712E93602900D7059D /* Beirut.ttc */; };
-		A41B99C62E97A64C00D7059D /* HVD_Peace.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A41B99C52E97A64C00D7059D /* HVD_Peace.ttf */; };
-		A41B99C72E97A64C00D7059D /* HVD_Peace.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A41B99C52E97A64C00D7059D /* HVD_Peace.ttf */; };
-		A41B99C82E97A64C00D7059D /* HVD_Peace.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A41B99C52E97A64C00D7059D /* HVD_Peace.ttf */; };
 		A41B99D22E97CA3A00D7059D /* Audiowide-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A41B99D12E97CA3A00D7059D /* Audiowide-Regular.ttf */; };
 		A41B99D32E97CA3A00D7059D /* Audiowide-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A41B99D12E97CA3A00D7059D /* Audiowide-Regular.ttf */; };
 		A41B99D42E97CA3A00D7059D /* Audiowide-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A41B99D12E97CA3A00D7059D /* Audiowide-Regular.ttf */; };
@@ -53,7 +50,6 @@
 
 /* Begin PBXFileReference section */
 		A41B99712E93602900D7059D /* Beirut.ttc */ = {isa = PBXFileReference; lastKnownFileType = file; path = Beirut.ttc; sourceTree = "<group>"; };
-		A41B99C52E97A64C00D7059D /* HVD_Peace.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = HVD_Peace.ttf; sourceTree = "<group>"; };
 		A41B99D12E97CA3A00D7059D /* Audiowide-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Audiowide-Regular.ttf"; sourceTree = "<group>"; };
 		A41B99D72E986E1200D7059D /* Arial Black.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Arial Black.ttf"; sourceTree = "<group>"; };
 		A41B99DF2E991F0B00D7059D /* BebasNeue-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BebasNeue-Regular.ttf"; sourceTree = "<group>"; };
@@ -141,7 +137,6 @@
 			children = (
 				A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */,
 				A41B99712E93602900D7059D /* Beirut.ttc */,
-				A41B99C52E97A64C00D7059D /* HVD_Peace.ttf */,
 				A41B99D12E97CA3A00D7059D /* Audiowide-Regular.ttf */,
 				A41B99D72E986E1200D7059D /* Arial Black.ttf */,
 				A41B99DF2E991F0B00D7059D /* BebasNeue-Regular.ttf */,
@@ -274,7 +269,6 @@
 			files = (
 				A4CB79FF2E91300E00BCBFAE /* Herculanum.ttf in Resources */,
 				A41B99E22E991F0B00D7059D /* BebasNeue-Regular.ttf in Resources */,
-				A41B99C82E97A64C00D7059D /* HVD_Peace.ttf in Resources */,
 				A41B99D82E986E1200D7059D /* Arial Black.ttf in Resources */,
 				A474C05B2EDBE6CE00210FA5 /* VT323.ttf in Resources */,
 				A474C05D2EDC68DF00210FA5 /* CrimsonText-SemiBold.ttf in Resources */,
@@ -292,7 +286,6 @@
 			files = (
 				A41B99722E93602900D7059D /* Beirut.ttc in Resources */,
 				A41B99E62E99329F00D7059D /* blowbrush.ttf in Resources */,
-				A41B99C62E97A64C00D7059D /* HVD_Peace.ttf in Resources */,
 				A41B99E02E991F0B00D7059D /* BebasNeue-Regular.ttf in Resources */,
 				A41B99DA2E986E1200D7059D /* Arial Black.ttf in Resources */,
 				A4CB79FE2E91300E00BCBFAE /* Herculanum.ttf in Resources */,
@@ -306,7 +299,6 @@
 			files = (
 				A41B99742E93602900D7059D /* Beirut.ttc in Resources */,
 				A41B99E52E99329F00D7059D /* blowbrush.ttf in Resources */,
-				A41B99C72E97A64C00D7059D /* HVD_Peace.ttf in Resources */,
 				A41B99E12E991F0B00D7059D /* BebasNeue-Regular.ttf in Resources */,
 				A41B99D92E986E1200D7059D /* Arial Black.ttf in Resources */,
 				A4CB7A002E91300E00BCBFAE /* Herculanum.ttf in Resources */,

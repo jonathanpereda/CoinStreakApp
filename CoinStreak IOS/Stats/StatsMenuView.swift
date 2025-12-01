@@ -108,6 +108,7 @@ struct StatsMenuView: View {
                 // Close button hit area
                 Button {
                     Haptics.shared.tap()
+                    SoundManager.shared.play("stats_turnoff")
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isOpen = false
                     }
@@ -282,6 +283,7 @@ struct StatsMenuView: View {
                 )
             }
             .onAppear {
+                SoundManager.shared.play("stats_startup")
                 onBackfill()
                 runStartupFlicker()
             }

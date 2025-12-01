@@ -15,7 +15,7 @@ func tierTheme(for tierName: String) -> TierTheme {
         return .init(backwall: "starter_backwall", font: "Herculanum",
                      loop: "elevator_hum1", loopGain: 0.35)
     case "Lab":
-        return .init(backwall: "lab_backwall1", font: "Beirut",
+        return .init(backwall: "new_lab_backwall", font: "Beirut",
                      loop: "lab_hum", loopGain: 0.45)
     case "News":
         return .init(backwall: "news_backwall", font: "CrimsonText-SemiBold",
@@ -24,7 +24,7 @@ func tierTheme(for tierName: String) -> TierTheme {
         return .init(backwall: "pond_backwall", font: "Chalkduster",
                      loop: "pond_mice", loopGain: 0.45)
     case "Brick":
-        return .init(backwall: "brick_backwall", font: "BlowBrush",
+        return .init(backwall: "new_brick_backwall", font: "BlowBrush",
                      loop: "brick_hum", loopGain: 0.45)
     case "Chair_Room":
         return .init(backwall: "chair_room_backwall", font: "DINCondensed-Bold",
@@ -38,6 +38,9 @@ func tierTheme(for tierName: String) -> TierTheme {
     case "Underwater":
         return .init(backwall: "underwater_backwall", font: "BebasNeue-Regular",
                      loop: "underwater_hum", loopGain: 0.45)
+    case "Lake":
+        return .init(backwall: "lake_backwall", font: "AcademyEngravedLetPlain",
+                     loop: "lake_hum", loopGain: 0.55)
     default:
         return .init(backwall: "starter_backwall", font: "Herculanum",
                      loop: nil, loopGain: 0.30)
@@ -57,6 +60,7 @@ private func streakNumberScale(for fontName: String) -> CGFloat {
     case "Audiowide-Regular":       return 1.00
     case "Arial-Black":             return 1.05
     case "BebasNeue-Regular":       return 1.38
+    case "AcademyEngravedLetPlain": return 1.20
     default:                        return 1.00
     }
 }

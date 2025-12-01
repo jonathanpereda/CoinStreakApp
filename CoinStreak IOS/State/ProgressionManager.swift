@@ -73,7 +73,7 @@ final class ProgressionManager: ObservableObject {
 
     let tuning: ProgressTuning
     let starterName: String = "Starter"
-    let nonStarterNames: [String] = ["Lab", "News", "Pond", "Brick", "Chair_Room", "Space", "Backrooms", "Underwater"] // fixed, ordered (not random)
+    let nonStarterNames: [String] = ["Lab", "News", "Pond", "Brick", "Chair_Room", "Space", "Backrooms", "Underwater", "Lake"] // fixed, ordered (not random)
     let linear: LinearConfig
 
     // MARK: - Derived (compat layer to minimize UI changes)
