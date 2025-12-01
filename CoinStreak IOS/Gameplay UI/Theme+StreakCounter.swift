@@ -17,6 +17,9 @@ func tierTheme(for tierName: String) -> TierTheme {
     case "Lab":
         return .init(backwall: "lab_backwall1", font: "Beirut",
                      loop: "lab_hum", loopGain: 0.45)
+    case "News":
+        return .init(backwall: "news_backwall", font: "CrimsonText-SemiBold",
+                     loop: "news_hum", loopGain: 0.45)
     case "Pond":
         return .init(backwall: "pond_backwall", font: "Chalkduster",
                      loop: "pond_mice", loopGain: 0.45)
@@ -45,14 +48,15 @@ private let BaseCounterPointSize: CGFloat = 184
 //Font rescale
 private func streakNumberScale(for fontName: String) -> CGFloat {
     switch fontName {
-    case "Herculanum":              return 1.40
+    case "Herculanum":              return 1.50
     case "Beirut":                  return 1.78
-    case "Chalkduster":             return 1.15
+    case "CrimsonText-SemiBold":    return 1.40
+    case "Chalkduster":             return 1.00
     case "PermanentMarker-Regular": return 1.10
-    case "DINCondensed-Bold":       return 1.14
-    case "Audiowide-Regular":       return 1.04
-    case "Arial-Black":             return 1.20
-    case "BebasNeue-Regular":       return 1.18
+    case "DINCondensed-Bold":       return 1.25
+    case "Audiowide-Regular":       return 1.00
+    case "Arial-Black":             return 1.05
+    case "BebasNeue-Regular":       return 1.38
     default:                        return 1.00
     }
 }

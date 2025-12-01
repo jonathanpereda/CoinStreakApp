@@ -93,6 +93,9 @@ struct ContentView: View {
     @State private var isStatsOpen = false
     @StateObject private var stats = StatsStore()
     
+    //News map
+    @State private var showNewsHeadlines = false
+    
 
     @State private var curState = "Heads"
 
@@ -225,9 +228,19 @@ struct ContentView: View {
                     doorLeftName: "starter_left",
                     doorRightName: "starter_right",
                     belowDoors: {
-                        // shows during open/close and when open
-                        if phase != .shop && !suppressStreakUntilCloseEnds {
-                            streakLayer(fontName: fontBelowName)
+                        ZStack {
+                            // NEWS HEADLINES: sit underneath the streak counter, only on the news map
+                            if theme.backwall == "news_backwall",
+                               phase != .shop,
+                               !isDoorsOpening,
+                               !isDoorsClosing {
+                                NewsHeadlinesOverlay(screenSize: geo.size)
+                            }
+
+                            // STREAK COUNTER: on top of headlines, during open/close and when open
+                            if phase != .shop && !suppressStreakUntilCloseEnds {
+                                streakLayer(fontName: fontBelowName)
+                            }
                         }
                     },
                     aboveDoors: {
@@ -246,6 +259,13 @@ struct ContentView: View {
                             restoreCounterAfterOpen = false
                         }
                         isDoorsOpening = false
+                        //Turn on news headlines
+                        let themeNow = tierTheme(for: progression.currentTierName)
+                        if phase != .shop && themeNow.backwall == "news_backwall" {
+                            showNewsHeadlines = true
+                        } else {
+                            showNewsHeadlines = false
+                        }
                     },
                     onCloseEnded: {
                         isDoorsClosing = false
@@ -1162,7 +1182,7 @@ struct ContentView: View {
             lastTierName  = progression.currentTierName
 
             updateTierLoop(tierTheme(for: progression.currentTierName))
-
+            
             sfxMutedUI   = SoundManager.shared.isSfxMuted
             musicMutedUI = SoundManager.shared.isMusicMuted
             
@@ -1176,7 +1196,6 @@ struct ContentView: View {
         // MARK: ON CHANGES
         .onChange(of: progression.tierIndex) { _, _ in
             SoundManager.shared.play("scrape_1")
-            
             
             let newName  = progression.currentTierName
             let newTheme = tierTheme(for: progression.currentTierName)
@@ -1215,6 +1234,7 @@ struct ContentView: View {
             lastTierName  = newName
             UserDefaults.standard.set(newName, forKey: "LastTierName")
             updateTierLoop(theme)
+            
         }
         .onChange(of: scenePhase) {_, newPhase in
             switch newPhase {
@@ -2244,6 +2264,7 @@ struct ContentView: View {
     }
 
 }
+
 
 // MARK: BOTTOM MENU BUTTONS
 

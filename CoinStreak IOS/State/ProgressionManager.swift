@@ -38,6 +38,7 @@ final class ProgressionManager: ObservableObject {
     private let kHighestTileVisited     = "highestTileVisited_v1" // 0 = Starter
     private let kBaselineFills_v110     = "pm_baselineFills_v110"
     private let kDidRebalanceTokens_v110 = "didRebalanceTokens_v110"
+    private let kDidInsertNews_v120     = "didInsertNews_v120"
 
     @Published var highestTileVisited: Int {
         didSet {
@@ -72,11 +73,7 @@ final class ProgressionManager: ObservableObject {
 
     let tuning: ProgressTuning
     let starterName: String = "Starter"
-    #if TRAILER_RESET
-    let nonStarterNames: [String] = ["Pond", "Space", "Brick", "Chair_Room", "Lab", "Backrooms", "Underwater"]
-    #else
-    let nonStarterNames: [String] = ["Lab", "Pond", "Brick", "Chair_Room", "Space", "Backrooms", "Underwater"] // fixed, ordered (not random)
-    #endif
+    let nonStarterNames: [String] = ["Lab", "News", "Pond", "Brick", "Chair_Room", "Space", "Backrooms", "Underwater"] // fixed, ordered (not random)
     let linear: LinearConfig
 
     // MARK: - Derived (compat layer to minimize UI changes)
@@ -151,6 +148,23 @@ final class ProgressionManager: ObservableObject {
             // Snapshot current fills so bar difficulty restarts at tier 0 for everyone.
             rebalanceBaselineFills = totalFills
             UserDefaults.standard.set(true, forKey: kDidRebalanceTokens_v110)
+        }
+        
+        // --- One-time migration for News map insertion (v1.2.1) ---
+        let didInsertNews = UserDefaults.standard.bool(forKey: kDidInsertNews_v120)
+        if !didInsertNews {
+            // Protect players who had reached Pond or beyond under the old layout.
+            // Old furthest tile index = highestTileVisited (0=Starter, 1=Lab, 2=Pond, ...).
+            if highestTileVisited >= 2 {
+                // After inserting News, that same conceptual furthest map is now at tile (highestTileVisited + 1).
+                // Minimum totalFills for tile T is 2*T - 1, so we require:
+                //   F >= 2 * (highestTileVisited + 1) - 1 = 2*highestTileVisited + 1
+                let requiredFills = max(0, 2 * highestTileVisited + 1)
+                if totalFills < requiredFills {
+                    totalFills = requiredFills
+                }
+            }
+            UserDefaults.standard.set(true, forKey: kDidInsertNews_v120)
         }
         
         // --- Self-heal: normalize saved progress against current target ---
