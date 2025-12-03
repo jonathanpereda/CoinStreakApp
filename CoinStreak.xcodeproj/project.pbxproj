@@ -24,6 +24,8 @@
 		A41B99E62E99329F00D7059D /* blowbrush.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A41B99E32E99329F00D7059D /* blowbrush.ttf */; };
 		A474C05B2EDBE6CE00210FA5 /* VT323.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A474C05A2EDBE6CE00210FA5 /* VT323.ttf */; };
 		A474C05D2EDC68DF00210FA5 /* CrimsonText-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A474C05C2EDC68DF00210FA5 /* CrimsonText-SemiBold.ttf */; };
+		A474C08A2EDFA50500210FA5 /* MacondoSwashCaps-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A474C0892EDFA50500210FA5 /* MacondoSwashCaps-Regular.ttf */; };
+		A474C08C2EE0345A00210FA5 /* ReenieBeanie-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A474C08B2EE0345A00210FA5 /* ReenieBeanie-Regular.ttf */; };
 		A4CB79FE2E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
 		A4CB79FF2E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
 		A4CB7A002E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
@@ -60,6 +62,8 @@
 		A451095F2E90546100E4AE05 /* CoinStreak IOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CoinStreak IOSUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A474C05A2EDBE6CE00210FA5 /* VT323.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = VT323.ttf; sourceTree = "<group>"; };
 		A474C05C2EDC68DF00210FA5 /* CrimsonText-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CrimsonText-SemiBold.ttf"; sourceTree = "<group>"; };
+		A474C0892EDFA50500210FA5 /* MacondoSwashCaps-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "MacondoSwashCaps-Regular.ttf"; sourceTree = "<group>"; };
+		A474C08B2EE0345A00210FA5 /* ReenieBeanie-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ReenieBeanie-Regular.ttf"; sourceTree = "<group>"; };
 		A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Herculanum.ttf; sourceTree = "<group>"; };
 		A4D316B72EB7034700C9057B /* battle_lose_red.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = battle_lose_red.mp4; sourceTree = "<group>"; };
 		A4D316B82EB7034700C9057B /* battle_win_green.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = battle_win_green.mp4; sourceTree = "<group>"; };
@@ -143,6 +147,8 @@
 				A41B99E32E99329F00D7059D /* blowbrush.ttf */,
 				A474C05A2EDBE6CE00210FA5 /* VT323.ttf */,
 				A474C05C2EDC68DF00210FA5 /* CrimsonText-SemiBold.ttf */,
+				A474C0892EDFA50500210FA5 /* MacondoSwashCaps-Regular.ttf */,
+				A474C08B2EE0345A00210FA5 /* ReenieBeanie-Regular.ttf */,
 			);
 			path = Fonts;
 			sourceTree = "<group>";
@@ -270,7 +276,9 @@
 				A4CB79FF2E91300E00BCBFAE /* Herculanum.ttf in Resources */,
 				A41B99E22E991F0B00D7059D /* BebasNeue-Regular.ttf in Resources */,
 				A41B99D82E986E1200D7059D /* Arial Black.ttf in Resources */,
+				A474C08A2EDFA50500210FA5 /* MacondoSwashCaps-Regular.ttf in Resources */,
 				A474C05B2EDBE6CE00210FA5 /* VT323.ttf in Resources */,
+				A474C08C2EE0345A00210FA5 /* ReenieBeanie-Regular.ttf in Resources */,
 				A474C05D2EDC68DF00210FA5 /* CrimsonText-SemiBold.ttf in Resources */,
 				A4D316B92EB7034700C9057B /* battle_lose_red.mp4 in Resources */,
 				A4D316BA2EB7034700C9057B /* battle_win_green.mp4 in Resources */,
@@ -425,7 +433,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.2.1;
 				"OTHER_SWIFT_FLAGS[arch=*]" = "-D TRAILER_RESET";
 				PRODUCT_BUNDLE_IDENTIFIER = "HorizonRidge.CoinStreak-IOS.Trailer";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -622,7 +630,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "HorizonRidge.CoinStreak-IOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -660,7 +668,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.horizonridge.coinstreak;
 				PRODUCT_NAME = "Flip Streak";
 				SDKROOT = iphoneos;

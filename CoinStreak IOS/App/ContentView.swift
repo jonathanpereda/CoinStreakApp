@@ -164,6 +164,13 @@ struct ContentView: View {
     @State private var currentOpponentName: String = "Opponent"
     @StateObject private var nameVM = NameEntryVM()
     @State private var currentMyName: String = "You"
+    
+    //Minigames
+    @StateObject private var minigameManager = MinigameManager(
+        api: CloudflareMinigameAPI(),
+        installId: InstallIdentity.getOrCreateInstallId()
+    )
+    @State private var isMinigameOpen = false
 
 
 
@@ -215,15 +222,27 @@ struct ContentView: View {
 
             let shadowYOffsetTweak: CGFloat = -157
             let shadowY_centerLocked = (groundY + baseShadowH / 2) + shadowYOffsetTweak
-            
+
             let theme = tierTheme(for: progression.currentTierName)
-            
+
+            // Resolve current backwall, including minigame takeover override
+            let baseBackwall = (phase == .shop ? "shop_backwall" : theme.backwall)
+            let currentBackwall: String = {
+                if minigameIsTakeover,
+                   let activeId = minigameManager.activeMinigameId,
+                   activeId == .callIt {
+                    return "callit_backwall"
+                } else {
+                    return baseBackwall
+                }
+            }()
+
             // MARK: MAIN UI RENDER
 
             ZStack {
-                
+
                 ElevatorSwitcher(
-                    currentBackwallName: (phase == .shop ? "shop_backwall" : theme.backwall),
+                    currentBackwallName: currentBackwall,
                     starterSceneName: "starter_backwall",
                     doorLeftName: "starter_left",
                     doorRightName: "starter_right",
@@ -238,14 +257,14 @@ struct ContentView: View {
                             }
 
                             // STREAK COUNTER: on top of headlines, during open/close and when open
-                            if phase != .shop && !suppressStreakUntilCloseEnds {
+                            if phase != .shop && !suppressStreakUntilCloseEnds && !minigameHidesHUD {
                                 streakLayer(fontName: fontBelowName)
                             }
                         }
                     },
                     aboveDoors: {
                         // top copy, animate with counterOpacity
-                        if phase != .shop && !suppressStreakUntilCloseEnds {
+                        if phase != .shop && !suppressStreakUntilCloseEnds && !minigameHidesHUD {
                             streakLayer(fontName: fontAboveName)
                                 .opacity(counterOpacity)
                         }
@@ -336,7 +355,7 @@ struct ContentView: View {
                     .clipped()
                     .ignoresSafeArea()
                 
-                // MARK: BAR & BADGE
+                // MARK: PROGRESS BAR
                 
                 // HUD: progress bar
                 if phase != .choosing {
@@ -377,7 +396,10 @@ struct ContentView: View {
                         .onChange(of: progression.tierIndex) { _, _ in
                             barPulse = nil
                         }
-                        .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen) ? 0 : 1)
+                        .opacity(
+                            (isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen || minigameHidesHUD)
+                            ? 0 : 1
+                        )
                         .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
                         .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
                         .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
@@ -417,6 +439,11 @@ struct ContentView: View {
                             )
                             .opacity(shopOpacity)
                         }
+                    }
+                    // Weekly minigame host: lives in the same layer as HUD / shop
+                    // so the coin (zIndex 100) stays visually on top.
+                    .overlay {
+                        minigameHostOverlay()
                     }
                     .onChange(of: phase) { _, newPhase in
                         if newPhase == .shop {
@@ -503,7 +530,12 @@ struct ContentView: View {
                                     // Only accept gestures that START inside the band
                                     let startY = v.startLocation.y
                                     guard startY >= bandMinY && startY <= bandMaxY else { return }
-                                    let visualOnly = (phase == .shop)
+
+                                    // When a takeover minigame is active, route all flips as visual-only
+                                    // so they animate but don't affect the main streak logic.
+                                    let hijackActive = minigameManager.isSessionActive
+                                        && (minigameHostConfig?.hijacksGameplayCoin ?? false)
+                                    let visualOnly = (phase == .shop) || hijackActive
 
                                     let dx = v.translation.width
                                     let dy = v.translation.height
@@ -516,7 +548,9 @@ struct ContentView: View {
                                         let extra = max(0, predUp - up)
                                         let raw = Double(up) + 0.5 * Double(extra)
                                         let impulse = raw / Double(H * 0.70)
-                                        if impulse > 0.15 { flipCoin(impulse: impulse, visualOnly: visualOnly) }
+                                        if impulse > 0.15 {
+                                            flipCoin(impulse: impulse, visualOnly: visualOnly)
+                                        }
                                     }
                                 }
                         )
@@ -541,6 +575,7 @@ struct ContentView: View {
                     }
                     // Container height == distance from top → baseline; column is bottom-aligned inside
                     .frame(width: geo.size.width, height: baselineY, alignment: .bottomLeading)
+                    .opacity(minigameHidesHUD ? 0 : 1)
                     .animation(.spring(response: 0.28, dampingFraction: 0.8), value: store.recent)
                     .transition(.opacity)
                     .allowsHitTesting(false)
@@ -877,6 +912,30 @@ struct ContentView: View {
                         .frame(height: min(180, UIScreen.main.bounds.height * 0.22))
                     }
                     .ignoresSafeArea(edges: .bottom)
+                }
+
+                // MARK: - MINIGAME GLOBAL OVERLAY
+                if let overlay = minigameManager.activeOverlay {
+                    ZStack {
+                        // Dim behind the overlay, but still allow the minigame scene to show through
+                        Color.black.opacity(overlay.dimOpacity)
+                            .ignoresSafeArea()
+
+                        // Minigame-provided overlay content (e.g. Call It leaderboard UI)
+                        overlay.content
+                            .ignoresSafeArea()
+                    }
+                    .transition(.opacity)
+                    .zIndex(1000)
+                    
+                    //Easy escape when testing
+                    /*.onTapGesture {
+                        if overlay.dismissOnBackgroundTap {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                minigameManager.activeOverlay = nil
+                            }
+                        }
+                    }*/
                 }
 
 
@@ -1433,6 +1492,7 @@ struct ContentView: View {
                 .zIndex(500)
             }
         }
+        
 
         .fullScreenCover(isPresented: $isBattleMenuOpen, onDismiss: {
             // no-op
@@ -1864,6 +1924,13 @@ struct ContentView: View {
 
     // Impulse-aware flip with visual-only mode for shop
     func flipCoin(impulse: Double?, visualOnly: Bool = false) {
+        // If a minigame is actively hijacking the gameplay coin, ignore normal (non-visual) flips.
+        if !visualOnly,
+           minigameManager.isSessionActive,
+           (minigameHostConfig?.hijacksGameplayCoin ?? false) {
+            return
+        }
+
         guard phase == .playing || (visualOnly && phase == .shop) else { return }
         guard !isFlipping && !isTierTransitioning else { return }
 
@@ -1898,6 +1965,14 @@ struct ContentView: View {
         // Capture state
         baseFaceAtLaunch = curState
         isFlipping = true
+
+        // If this is a visual-only flip while a hijacking minigame is active,
+        // notify the minigame that the flip has begun (so it can lock selection, etc.).
+        if visualOnly,
+           minigameManager.isSessionActive,
+           (minigameHostConfig?.hijacksGameplayCoin ?? false) {
+            minigameManager.onVisualFlipBegan?()
+        }
 
         // Choose parity target (odd/even) to land on desired
         let needOdd = (desired != baseFaceAtLaunch)
@@ -1948,6 +2023,13 @@ struct ContentView: View {
                 baseFaceAtLaunch = desired
                 isFlipping = false
                 spritePlan = nil
+            }
+
+            // Notify any hijacking minigame of the visual-only flip outcome.
+            if visualOnly,
+               minigameManager.isSessionActive,
+               (minigameHostConfig?.hijacksGameplayCoin ?? false) {
+                minigameManager.onVisualFlipResolved?(desired)
             }
 
             // Bounce & wobble
@@ -2457,6 +2539,48 @@ private extension ContentView {
                 .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
                 .animation(.easeInOut(duration: 0.2), value: isMoreOpen)
                 
+                
+                // WEEKLY MINIGAME button
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                        // Close any bottom sheets when opening minigame
+                        isMapSelectOpen = false
+                        isSettingsOpen = false
+                        isTrophiesOpen = false
+                        isMoreOpen = false
+                    }
+                    minigameManager.beginSession()
+                    Haptics.shared.tap()
+                } label: {
+                    VStack(spacing: 4) {
+                        if let remaining = minigameManager.timeRemaining {
+                            Text(formatMinigameTimeRemaining(remaining))
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundColor(.white.opacity(0.7))
+                        } else {
+                            Text("Weekly")
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+  
+                        SquareHUDButton(isOutlined: false) {
+                            Image(systemName: "gamecontroller.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .opacity((isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen) ? 0 : 1)
+                .disabled(isMapSelectOpen || isSettingsOpen || isTrophiesOpen || isMoreOpen)
+                .animation(.easeInOut(duration: 0.2), value: isMapSelectOpen)
+                .animation(.easeInOut(duration: 0.2), value: isSettingsOpen)
+                .animation(.easeInOut(duration: 0.2), value: isTrophiesOpen)
+                .animation(.easeInOut(duration: 0.2), value: isMoreOpen)
+                
             }
 
             // === Map toast ===
@@ -2564,7 +2688,11 @@ private extension ContentView {
         .padding(.leading, 24)
         .padding(.trailing, 96)
         .padding(.bottom, 30)
-        .opacity((phase != .choosing && phase != .shop) ? 1 : 0)
+        .opacity(
+            (phase != .choosing && phase != .shop) &&
+            !(minigameManager.isSessionActive && (minigameManager.currentHostConfig?.hidesBottomMenu ?? false))
+            ? 1 : 0
+        )
         .animation(.easeInOut(duration: 0.2), value: phase)
         
         // MARK: - MORE MENU WINDOW
@@ -2648,12 +2776,75 @@ private extension ContentView {
         }
 
     }
+    
+    private func formatMinigameTimeRemaining(_ interval: TimeInterval) -> String {
+        let totalSeconds = Int(interval)
+        let days = totalSeconds / 86_400
+        let hours = (totalSeconds % 86_400) / 3_600
+        let minutes = (totalSeconds % 3_600) / 60
+
+        if days > 0 {
+            return "\(days)d \(String(format: "%02d", hours))h"
+        } else {
+            return String(format: "%02d:%02d", hours, minutes)
+        }
+    }
 }
 
 
-// MARK: CHOOSE SCREEN OVERLAY
+// MARK: CHOOSE/MINIGAME OVERLAY
 
 private extension ContentView {
+    
+    // MARK: Minigame host helpers
+    
+    /// Convenience for reading the current minigame host config (if any).
+    var minigameHostConfig: MinigameHostConfig? {
+        minigameManager.currentHostConfig
+    }
+    
+    /// True when an active minigame has requested that the main HUD be hidden.
+    var minigameHidesHUD: Bool {
+        minigameManager.isSessionActive && (minigameHostConfig?.hidesStreakHUD ?? false)
+    }
+    
+    /// True when an active minigame is running in a dedicated screen / takeover mode.
+    var minigameIsTakeover: Bool {
+        minigameManager.isSessionActive && (minigameHostConfig?.mode == .dedicatedScreen)
+    }
+    
+    @ViewBuilder
+    func minigameHostOverlay() -> some View {
+        if minigameManager.isSessionActive,
+           let registered = minigameManager.currentRegisteredMinigame,
+           let hostConfig = minigameManager.currentHostConfig {
+
+            let context = MinigameContext(
+                manager: minigameManager,
+                flipCoinVisual: { flipCoin(visualOnly: true) }
+            )
+
+            switch hostConfig.mode {
+            case .overlay:
+                ZStack {
+                    Color.black.opacity(0.55)
+                        .ignoresSafeArea()
+                    registered.makeView(context)
+                }
+                .transition(.opacity)
+                .zIndex(550)
+
+            case .dedicatedScreen:
+                // For dedicated-screen minigames like Call It, let the underlying
+                // coin/table/backwall show through and let the minigame view
+                // decide how much additional chrome or dimming it wants.
+                registered.makeView(context)
+                    .transition(.opacity)
+                    .zIndex(550)
+            }
+        }
+    }
+    
     @ViewBuilder
     func chooseOverlay(_ geo: GeometryProxy, groundY: CGFloat) -> some View {
         if phase == .choosing {
