@@ -26,6 +26,8 @@
 		A474C05D2EDC68DF00210FA5 /* CrimsonText-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A474C05C2EDC68DF00210FA5 /* CrimsonText-SemiBold.ttf */; };
 		A474C08A2EDFA50500210FA5 /* MacondoSwashCaps-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A474C0892EDFA50500210FA5 /* MacondoSwashCaps-Regular.ttf */; };
 		A474C08C2EE0345A00210FA5 /* ReenieBeanie-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A474C08B2EE0345A00210FA5 /* ReenieBeanie-Regular.ttf */; };
+		A474C0922EE2B97600210FA5 /* UncialAntiqua-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A474C0912EE2B97600210FA5 /* UncialAntiqua-Regular.ttf */; };
+		A474C0972EE4395900210FA5 /* Limelight-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A474C0962EE4395900210FA5 /* Limelight-Regular.ttf */; };
 		A4CB79FE2E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
 		A4CB79FF2E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
 		A4CB7A002E91300E00BCBFAE /* Herculanum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */; };
@@ -64,6 +66,8 @@
 		A474C05C2EDC68DF00210FA5 /* CrimsonText-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CrimsonText-SemiBold.ttf"; sourceTree = "<group>"; };
 		A474C0892EDFA50500210FA5 /* MacondoSwashCaps-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "MacondoSwashCaps-Regular.ttf"; sourceTree = "<group>"; };
 		A474C08B2EE0345A00210FA5 /* ReenieBeanie-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ReenieBeanie-Regular.ttf"; sourceTree = "<group>"; };
+		A474C0912EE2B97600210FA5 /* UncialAntiqua-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "UncialAntiqua-Regular.ttf"; sourceTree = "<group>"; };
+		A474C0962EE4395900210FA5 /* Limelight-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Limelight-Regular.ttf"; sourceTree = "<group>"; };
 		A4CB79FD2E91300E00BCBFAE /* Herculanum.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Herculanum.ttf; sourceTree = "<group>"; };
 		A4D316B72EB7034700C9057B /* battle_lose_red.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = battle_lose_red.mp4; sourceTree = "<group>"; };
 		A4D316B82EB7034700C9057B /* battle_win_green.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = battle_win_green.mp4; sourceTree = "<group>"; };
@@ -149,6 +153,8 @@
 				A474C05C2EDC68DF00210FA5 /* CrimsonText-SemiBold.ttf */,
 				A474C0892EDFA50500210FA5 /* MacondoSwashCaps-Regular.ttf */,
 				A474C08B2EE0345A00210FA5 /* ReenieBeanie-Regular.ttf */,
+				A474C0912EE2B97600210FA5 /* UncialAntiqua-Regular.ttf */,
+				A474C0962EE4395900210FA5 /* Limelight-Regular.ttf */,
 			);
 			path = Fonts;
 			sourceTree = "<group>";
@@ -276,6 +282,8 @@
 				A4CB79FF2E91300E00BCBFAE /* Herculanum.ttf in Resources */,
 				A41B99E22E991F0B00D7059D /* BebasNeue-Regular.ttf in Resources */,
 				A41B99D82E986E1200D7059D /* Arial Black.ttf in Resources */,
+				A474C0972EE4395900210FA5 /* Limelight-Regular.ttf in Resources */,
+				A474C0922EE2B97600210FA5 /* UncialAntiqua-Regular.ttf in Resources */,
 				A474C08A2EDFA50500210FA5 /* MacondoSwashCaps-Regular.ttf in Resources */,
 				A474C05B2EDBE6CE00210FA5 /* VT323.ttf in Resources */,
 				A474C08C2EE0345A00210FA5 /* ReenieBeanie-Regular.ttf in Resources */,

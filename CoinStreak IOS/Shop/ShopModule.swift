@@ -219,7 +219,9 @@ final class ShopVM: ObservableObject {
     }
 
     func equip(_ item: ShopItem) {
-        guard owned.contains(item.id) else { return }
+        // Any item that reaches here is considered legitimately owned:
+        // either purchased with tokens or unlocked via a reward.
+        owned.insert(item.id)
         equipped[item.category] = item.id
         save()
     }
@@ -239,6 +241,34 @@ struct ShopItem: Identifiable, Hashable, Codable {
     let title: String
     let price: Int
     let symbolName: String   // placeholder SFSymbol for now
+
+    /// Optional hint for items that are unlocked via minigames or other
+    /// non-token mechanisms. When non-nil, the shop should treat this
+    /// item as reward-only (not purchasable with tokens) and display
+    /// this hint instead of a token price until unlocked.
+    let unlockHint: String?
+
+    /// Optional backend asset key used for reward-unlock mapping.
+    /// When nil, we fall back to using `id` as the key.
+    let assetKey: String?
+
+    init(
+        id: String,
+        category: ShopCategory,
+        title: String,
+        price: Int,
+        symbolName: String,
+        unlockHint: String? = nil,
+        assetKey: String? = nil
+    ) {
+        self.id = id
+        self.category = category
+        self.title = title
+        self.price = price
+        self.symbolName = symbolName
+        self.unlockHint = unlockHint
+        self.assetKey = assetKey
+    }
 }
 
 enum ShopCatalog {
@@ -246,28 +276,50 @@ enum ShopCatalog {
         switch category {
         case .coins:
             return [
-                .init(id: "starter", category: .coins, title: "Starter", price: 0,   symbolName: "circle"),
-                .init(id: "silver",    category: .coins, title: "Silver",    price: 650, symbolName: "circle.fill"),
-                .init(id: "voxel",    category: .coins, title: "Voxel",    price: 700, symbolName: "circle.fill"),
-                .init(id: "chip",    category: .coins, title: "Chip",    price: 1200, symbolName: "circle.fill"),
-                .init(id: "vinyl",    category: .coins, title: "Vinyl",    price: 1450, symbolName: "circle.fill"),
-                .init(id: "cap",    category: .coins, title: "Cap",    price: 1800, symbolName: "circle.fill"),
+                .init(id: "starter", category: .coins, title: "Starter", price: 0,   symbolName: "circle",      unlockHint: nil),
+                .init(id: "silver",  category: .coins, title: "Silver",  price: 650, symbolName: "circle.fill", unlockHint: nil),
+                .init(id: "voxel",   category: .coins, title: "Voxel",   price: 700, symbolName: "circle.fill", unlockHint: nil),
+                .init(id: "chip",    category: .coins, title: "Chip",    price: 1200,symbolName: "circle.fill", unlockHint: nil),
+                .init(id: "vinyl",   category: .coins, title: "Vinyl",   price: 1450,symbolName: "circle.fill", unlockHint: nil),
+                .init(id: "cap",     category: .coins, title: "Cap",     price: 1800,symbolName: "circle.fill", unlockHint: nil),
+
+                // Reward-only coin unlocked via minigame rewards
+                .init(
+                    id: "callit",
+                    category: .coins,
+                    title: "Call It Coin",
+                    price: 0,                  // ignored for reward-only items
+                    symbolName: "circle.fill",
+                    unlockHint: "Win 'Call It' minigame",
+                    assetKey: "callit_coin"
+                )
             ]
         case .tables:
             return [
-                .init(id: "starter",    category: .tables, title: "Starter",    price: 0,   symbolName: "rectangle.dashed"),
-                .init(id: "blue",       category: .tables, title: "Blue",       price: 250, symbolName: "rectangle.portrait"),
-                .init(id: "orange",     category: .tables, title: "Orange",     price: 250, symbolName: "rectangle.fill"),
-                .init(id: "purple",     category: .tables, title: "Purple",     price: 300, symbolName: "rectangle.fill"),
-                .init(id: "team",  category: .tables, title: "Team", price: 400, symbolName: "shippingbox"),
-                .init(id: "picnic",     category: .tables, title: "Picnic",     price: 500, symbolName: "checkerboard.rectangle"),
-                .init(id: "rug",     category: .tables, title: "Rug",     price: 500, symbolName: "checkerboard.rectangle"),
-                .init(id: "bamboo",  category: .tables, title: "Bamboo", price: 500, symbolName: "shippingbox"),
-                .init(id: "disco",      category: .tables, title: "Disco",      price: 650, symbolName: "sparkles.rectangle.stack"),
-                .init(id: "tile",     category: .tables, title: "Tile",     price: 700, symbolName: "rectangle.fill"),
-                .init(id: "woodcrate",  category: .tables, title: "Wood Crate", price: 900, symbolName: "shippingbox"),
-                .init(id: "road",     category: .tables, title: "Road",     price: 1000, symbolName: "rectangle.fill"),
-                .init(id: "blackjack",  category: .tables, title: "Blackjack",  price: 1000, symbolName: "suit.club.fill")
+                .init(id: "starter",   category: .tables, title: "Starter",   price: 0,    symbolName: "rectangle.dashed",   unlockHint: nil),
+                .init(id: "blue",      category: .tables, title: "Blue",      price: 250,  symbolName: "rectangle.portrait", unlockHint: nil),
+                .init(id: "orange",    category: .tables, title: "Orange",    price: 250,  symbolName: "rectangle.fill",     unlockHint: nil),
+                .init(id: "purple",    category: .tables, title: "Purple",    price: 300,  symbolName: "rectangle.fill",     unlockHint: nil),
+                .init(id: "team",      category: .tables, title: "Team",      price: 400,  symbolName: "shippingbox",        unlockHint: nil),
+                .init(id: "picnic",    category: .tables, title: "Picnic",    price: 500,  symbolName: "checkerboard.rectangle", unlockHint: nil),
+                .init(id: "rug",       category: .tables, title: "Rug",       price: 500,  symbolName: "checkerboard.rectangle", unlockHint: nil),
+                .init(id: "bamboo",    category: .tables, title: "Bamboo",    price: 500,  symbolName: "shippingbox",        unlockHint: nil),
+                .init(id: "disco",     category: .tables, title: "Disco",     price: 650,  symbolName: "sparkles.rectangle.stack", unlockHint: nil),
+                .init(id: "tile",      category: .tables, title: "Tile",      price: 700,  symbolName: "rectangle.fill",     unlockHint: nil),
+                .init(id: "woodcrate", category: .tables, title: "Wood Crate",price: 900,  symbolName: "shippingbox",        unlockHint: nil),
+                .init(id: "road",      category: .tables, title: "Road",      price: 1000, symbolName: "rectangle.fill",     unlockHint: nil),
+                .init(id: "blackjack", category: .tables, title: "Blackjack", price: 1000, symbolName: "suit.club.fill",     unlockHint: nil),
+
+                // Reward-only table unlocked via minigame rewards
+                .init(
+                    id: "callit",
+                    category: .tables,
+                    title: "Call It Table",
+                    price: 0,                  // ignored for reward-only items
+                    symbolName: "shippingbox",
+                    unlockHint: "Win 'Call It' minigame",
+                    assetKey: "callit_table"
+                )
             ]
         }
     }
@@ -383,9 +435,10 @@ private struct ShopItemCell: View {
     let displayPrice: Int
     let onTap: () -> Void
     let onBuy: () -> Void
-    
+
     let tableThumbName: String?
     let coinThumbName: String?
+    let unlockHint: String?
 
     var body: some View {
         let tile = ZStack {
@@ -428,18 +481,29 @@ private struct ShopItemCell: View {
                 }
 
                 if !owned {
-                    HStack(spacing: 6) {
-                        Text("\(displayPrice)")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.white)
-                        Image("tokens_icon")
-                            .resizable()
-                            .interpolation(.high)
-                            .scaledToFit()
-                            .frame(width: 22, height: 22)
-                            .foregroundColor(.yellow.opacity(0.9))
+                    if let hint = unlockHint {
+                        // Reward-only item that hasn't been unlocked yet:
+                        // show the hint instead of a token price.
+                        Text(hint)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
+                            .padding(.horizontal, 4)
+                    } else {
+                        HStack(spacing: 6) {
+                            Text("\(displayPrice)")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.white)
+                            Image("tokens_icon")
+                                .resizable()
+                                .interpolation(.high)
+                                .scaledToFit()
+                                .frame(width: 22, height: 22)
+                                .foregroundColor(.yellow.opacity(0.9))
+                        }
                     }
-                    //.opacity(confirming ? 0 : 1)
                 }
             }
             .padding(12)
@@ -463,6 +527,7 @@ struct ShopOverlay: View {
     @Binding var equippedTableKey: String
     @Binding var equippedCoinKey: String
     let sideProvider: () -> String
+    @ObservedObject var unlocks: ShopUnlocksStore
     @State private var overridesVersion: String = ""
 
     private var sx: CGFloat { max(1e-6, size.width / 1320.0) }
@@ -587,15 +652,29 @@ struct ShopOverlay: View {
                         }
                         return nil
                     }()
+                    // Reward-only items are identified by a non-nil unlockHint.
+                    let isRewardUnlockable = (item.unlockHint != nil)
+
+                    // Prefer explicit backend assetKey when present; fall back to id.
+                    let assetKey = item.assetKey ?? item.id
+
+                    // If the backend has marked this assetKey as unlocked, treat it as owned
+                    // even if it was never purchased with tokens.
+                    let isUnlockedViaReward = isRewardUnlockable && unlocks.isUnlocked(assetKey)
+
+                    // Unified ownership flag for UI purposes.
+                    let ownedForUI = vm.isOwned(item.id) || isUnlockedViaReward
+
                     let displayPrice = RemoteShop.price(for: item)
                     ShopItemCell(
                         item: item,
-                        owned: vm.isOwned(item.id),
+                        owned: ownedForUI,
                         equipped: vm.isEquipped(item.id, in: vm.selectedCategory),
                         confirming: vm.confirmingItemId == item.id,
                         displayPrice: displayPrice,
                         onTap: {
-                            if vm.isOwned(item.id) {
+                            if ownedForUI {
+                                // Already owned (either purchased or unlocked via rewards): equip it.
                                 vm.equip(item)
                                 if item.category == .tables {
                                     equippedTableKey = item.id
@@ -605,11 +684,19 @@ struct ShopOverlay: View {
                                     equippedCoinKey = item.id
                                 }
                             } else {
-                                let affordable = (tokenBalance >= displayPrice)
-                                if affordable {
-                                    vm.beginConfirm(for: item.id, affordable: true, lockPrice: displayPrice)
-                                } else {
+                                // Not owned yet.
+                                if isRewardUnlockable {
+                                    // Reward-only item that hasn't been unlocked yet:
+                                    // can't buy with tokens, just give a gentle denial haptic.
                                     Haptics.shared.deny()
+                                } else {
+                                    // Normal token-purchasable item.
+                                    let affordable = (tokenBalance >= displayPrice)
+                                    if affordable {
+                                        vm.beginConfirm(for: item.id, affordable: true, lockPrice: displayPrice)
+                                    } else {
+                                        Haptics.shared.deny()
+                                    }
                                 }
                             }
                         },
@@ -628,7 +715,8 @@ struct ShopOverlay: View {
                             }
                         },
                         tableThumbName: thumb,
-                        coinThumbName: coinThumb
+                        coinThumbName: coinThumb,
+                        unlockHint: (ownedForUI ? nil : item.unlockHint)
                     )
                 }
             }

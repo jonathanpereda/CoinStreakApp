@@ -63,6 +63,7 @@ struct ContentView: View {
     
     //SHOP
     @StateObject private var shopVM = ShopVM()
+    @StateObject private var shopUnlocks = ShopUnlocksStore()
     @State private var restoreCounterAfterOpen = false
     // Shop fade-in opacity (0…1)
     @State private var shopOpacity: Double = 0.0
@@ -171,8 +172,15 @@ struct ContentView: View {
         installId: InstallIdentity.getOrCreateInstallId()
     )
     @State private var isMinigameOpen = false
+    @AppStorage("minigame_lastFinishedPeriodSeen")
+    private var lastSeenFinishedPeriodId: String?
+    @State private var showMinigameResults: Bool = false
+    @State private var showMinigameToast: Bool = false
+    @State private var minigameToastMessage: String = ""
 
-
+    // Call It minigame custom transition
+    @State private var showCallItTransition: Bool = false
+    @State private var callItExitTrigger: Int = 0
 
     @ViewBuilder
     private func streakLayer(fontName: String) -> some View {
@@ -222,120 +230,149 @@ struct ContentView: View {
 
             let shadowYOffsetTweak: CGFloat = -157
             let shadowY_centerLocked = (groundY + baseShadowH / 2) + shadowYOffsetTweak
+            
+            let isTakeoverMinigameActive: Bool = {
+                guard minigameManager.isSessionActive,
+                      let hostConfig = minigameManager.currentHostConfig
+                else { return false }
+                return hostConfig.mode == .dedicatedScreen
+            }()
 
             let theme = tierTheme(for: progression.currentTierName)
 
-            // Resolve current backwall, including minigame takeover override
-            let baseBackwall = (phase == .shop ? "shop_backwall" : theme.backwall)
             let currentBackwall: String = {
-                if minigameIsTakeover,
-                   let activeId = minigameManager.activeMinigameId,
-                   activeId == .callIt {
-                    return "callit_backwall"
-                } else {
-                    return baseBackwall
+                // If a dedicated-screen minigame is active, use "<minigame_raw_value>_backwall"
+                if minigameManager.isSessionActive,
+                   let hostConfig = minigameManager.currentHostConfig,
+                   hostConfig.mode == .dedicatedScreen,
+                   let id = minigameManager.activeMinigameId {
+                    return "\(id.rawValue)_backwall"
                 }
+
+                // Shop has its own fixed backwall
+                if phase == .shop {
+                    return "shop_backwall"
+                }
+
+                // Otherwise use the normal tier backwall
+                return theme.backwall
             }()
 
             // MARK: MAIN UI RENDER
 
             ZStack {
+                // Call It "lights out" transition layer
+                if showCallItTransition {
+                    CallItTransitionOverlay(
+                        isActive: $showCallItTransition,
+                        isPaused: minigameManager.activeOverlay != nil,
+                        exitTrigger: callItExitTrigger
+                    )
+                    .zIndex(2000)
+                }
+                
+                if isTakeoverMinigameActive {
+                    Image(currentBackwall)
+                        .resizable()
+                        .scaledToFill()
+                        .ignoresSafeArea()
+                } else {
+                    // Normal maps/shop: full elevator + doors + headlines + streak
+                    ElevatorSwitcher(
+                        currentBackwallName: currentBackwall,
+                        starterSceneName: "starter_backwall",
+                        doorLeftName: "starter_left",
+                        doorRightName: "starter_right",
+                        belowDoors: {
+                            ZStack {
+                                // NEWS HEADLINES: sit underneath the streak counter, only on the news map
+                                if theme.backwall == "news_backwall",
+                                   phase != .shop,
+                                   !isDoorsOpening,
+                                   !isDoorsClosing {
+                                    NewsHeadlinesOverlay(screenSize: geo.size)
+                                }
 
-                ElevatorSwitcher(
-                    currentBackwallName: currentBackwall,
-                    starterSceneName: "starter_backwall",
-                    doorLeftName: "starter_left",
-                    doorRightName: "starter_right",
-                    belowDoors: {
-                        ZStack {
-                            // NEWS HEADLINES: sit underneath the streak counter, only on the news map
-                            if theme.backwall == "news_backwall",
-                               phase != .shop,
-                               !isDoorsOpening,
-                               !isDoorsClosing {
-                                NewsHeadlinesOverlay(screenSize: geo.size)
+                                // STREAK COUNTER: on top of headlines, during open/close and when open
+                                if phase != .shop && !suppressStreakUntilCloseEnds && !minigameHidesHUD {
+                                    streakLayer(fontName: fontBelowName)
+                                }
                             }
-
-                            // STREAK COUNTER: on top of headlines, during open/close and when open
+                        },
+                        aboveDoors: {
+                            // top copy, animate with counterOpacity
                             if phase != .shop && !suppressStreakUntilCloseEnds && !minigameHidesHUD {
-                                streakLayer(fontName: fontBelowName)
+                                streakLayer(fontName: fontAboveName)
+                                    .opacity(counterOpacity)
+                            }
+                        },
+                        shouldShowAboveAfterClose: {
+                            !pendingEnterShopAfterClose
+                        },
+                        onOpenEnded: {
+                            if restoreCounterAfterOpen {
+                                withAnimation(.easeInOut(duration: 0.25)) { counterOpacity = 1.0 }
+                                restoreCounterAfterOpen = false
+                            }
+                            isDoorsOpening = false
+                            //Turn on news headlines
+                            let themeNow = tierTheme(for: progression.currentTierName)
+                            if phase != .shop && themeNow.backwall == "news_backwall" {
+                                showNewsHeadlines = true
+                            } else {
+                                showNewsHeadlines = false
+                            }
+                        },
+                        onCloseEnded: {
+                            isDoorsClosing = false
+                            showShopUI = false
+                            shopOpacity = 0.0
+                            // doors just finished closing on Starter → switch both to Starter font, then (optionally) fade top in
+                            let now = Date()
+                            doorDustTrigger = now
+                            // auto-clear after the effect ends (keep in sync with DoorDustLine.duration)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.60) {
+                                if doorDustTrigger == now { doorDustTrigger = nil }
+                            }
+                            let starterFont = tierTheme(for: "Starter").font
+                            fontBelowName = starterFont
+                            fontAboveName = starterFont
+                            if deferCounterFadeInUntilClose {
+                                withAnimation(.easeInOut(duration: 0.25)) { counterOpacity = 1.0 }
+                                deferCounterFadeInUntilClose = false
+                            }
+                            // If a manual nonstarter→nonstarter selection is waiting, jump to it now (this triggers OPEN)
+                            if let pending = manualTargetAfterClose {
+                                manualTargetAfterClose = nil
+                                progression.jumpToLevelIndex(pending)
+                            }
+                            // Entering shop from a non-starter: switch to shop now (will OPEN)
+                            if pendingEnterShopAfterClose {
+                                pendingEnterShopAfterClose = false
+                                withAnimation(.easeInOut(duration: 0.2)) { phase = .shop }
+                                switchToShopMusic()
+                                return
+                            }
+
+                            // Exiting shop: we just finished the CLOSE to Starter
+                            if let idx = pendingExitShopToIndex {
+                                // Allow streak to show again (we hid it only during the close)
+                                suppressStreakUntilCloseEnds = false
+                                // Fade out shop loop; the OPEN will start the map loop via tier change
+                                SoundManager.shared.stopLoop(fadeOut: 0.4)
+                                // Now OPEN to the previous map
+                                pendingExitShopToIndex = nil
+                                progression.jumpToLevelIndex(idx)     // starter → non-starter triggers OPEN
+                            } else {
+                                // Exiting to Starter (no reopen)
+                                suppressStreakUntilCloseEnds = false
+                                // Bring the streak back now that the doors are fully closed
+                                withAnimation(.easeInOut(duration: 0.25)) { counterOpacity = 1.0 }
+                                switchToMapMusic()
                             }
                         }
-                    },
-                    aboveDoors: {
-                        // top copy, animate with counterOpacity
-                        if phase != .shop && !suppressStreakUntilCloseEnds && !minigameHidesHUD {
-                            streakLayer(fontName: fontAboveName)
-                                .opacity(counterOpacity)
-                        }
-                    },
-                    shouldShowAboveAfterClose: {
-                        !pendingEnterShopAfterClose
-                    },
-                    onOpenEnded: {
-                        if restoreCounterAfterOpen {
-                            withAnimation(.easeInOut(duration: 0.25)) { counterOpacity = 1.0 }
-                            restoreCounterAfterOpen = false
-                        }
-                        isDoorsOpening = false
-                        //Turn on news headlines
-                        let themeNow = tierTheme(for: progression.currentTierName)
-                        if phase != .shop && themeNow.backwall == "news_backwall" {
-                            showNewsHeadlines = true
-                        } else {
-                            showNewsHeadlines = false
-                        }
-                    },
-                    onCloseEnded: {
-                        isDoorsClosing = false
-                        showShopUI = false
-                        shopOpacity = 0.0
-                        // doors just finished closing on Starter → switch both to Starter font, then (optionally) fade top in
-                        let now = Date()
-                        doorDustTrigger = now
-                        // auto-clear after the effect ends (keep in sync with DoorDustLine.duration)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.60) {
-                            if doorDustTrigger == now { doorDustTrigger = nil }
-                        }
-                        let starterFont = tierTheme(for: "Starter").font
-                        fontBelowName = starterFont
-                        fontAboveName = starterFont
-                        if deferCounterFadeInUntilClose {
-                            withAnimation(.easeInOut(duration: 0.25)) { counterOpacity = 1.0 }
-                            deferCounterFadeInUntilClose = false
-                        }
-                        // If a manual nonstarter→nonstarter selection is waiting, jump to it now (this triggers OPEN)
-                        if let pending = manualTargetAfterClose {
-                            manualTargetAfterClose = nil
-                            progression.jumpToLevelIndex(pending)
-                        }
-                        // Entering shop from a non-starter: switch to shop now (will OPEN)
-                        if pendingEnterShopAfterClose {
-                            pendingEnterShopAfterClose = false
-                            withAnimation(.easeInOut(duration: 0.2)) { phase = .shop }
-                            switchToShopMusic()
-                            return
-                        }
-
-                        // Exiting shop: we just finished the CLOSE to Starter
-                        if let idx = pendingExitShopToIndex {
-                            // Allow streak to show again (we hid it only during the close)
-                            suppressStreakUntilCloseEnds = false
-                            // Fade out shop loop; the OPEN will start the map loop via tier change
-                            SoundManager.shared.stopLoop(fadeOut: 0.4)
-                            // Now OPEN to the previous map
-                            pendingExitShopToIndex = nil
-                            progression.jumpToLevelIndex(idx)     // starter → non-starter triggers OPEN
-                        } else {
-                            // Exiting to Starter (no reopen)
-                            suppressStreakUntilCloseEnds = false
-                            // Bring the streak back now that the doors are fully closed
-                            withAnimation(.easeInOut(duration: 0.25)) { counterOpacity = 1.0 }
-                            switchToMapMusic()
-                        }
-
-                    }
-                )
+                    )
+                }
                 
                 if let trig = doorDustTrigger {
                     DoorDustLine.seamBurst(trigger: trig)
@@ -348,12 +385,12 @@ struct ContentView: View {
                     if let f = store.chosenFace { return (f == .Heads ? "h" : "t") }
                     return "h" // safe default while we restore face
                 }()
-                Image(equippedTableImage.isEmpty ? "starter_table_\(sideLetter)" : equippedTableImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .ignoresSafeArea()
+
+                TableView(
+                    sideLetter: sideLetter,
+                    equippedTableImage: equippedTableImage,
+                    screenSize: geo.size
+                )
                 
                 // MARK: PROGRESS BAR
                 
@@ -435,7 +472,8 @@ struct ContentView: View {
                                 equippedTableImage: $equippedTableImage,
                                 equippedTableKey: $equippedTableKey,
                                 equippedCoinKey: $equippedCoinKey,
-                                sideProvider: { (store.chosenFace == .Heads) ? "h" : "t" }
+                                sideProvider: { (store.chosenFace == .Heads) ? "h" : "t" },
+                                unlocks: shopUnlocks
                             )
                             .opacity(shopOpacity)
                         }
@@ -942,67 +980,23 @@ struct ContentView: View {
             }
             .ignoresSafeArea()
             .ignoresSafeArea(.keyboard)
+            
+            
+            .onChange(of: minigameManager.isSessionActive) {_, isActive in
+                if !isActive {
+                    callItExitTrigger &+= 1
+                }
+            }
 
 
             // MARK: DEBUG BUTTONS
-            
-            #if TRAILER
+            /*
+            #if DEBUG
             .overlay(alignment: .topLeading) {
                 VStack(spacing: 6) {
                     // ⬅︎ Reset button
                     Button("◀︎") {
-                        // 0) Stop polling during reset (optional)
-                        scoreboardVM.stopPolling()
-
-                        // 1) Ask server to remove this install's contribution (optional but clean)
-                        //let oldId = InstallIdentity.getOrCreateInstallId()
-                        Task {
-                            //_ = await ScoreboardAPI.retireAndKeepSide(installId: oldId)
-                            // Note: this keeps the server's side lock for this oldId, which is fine
-                            // because we're about to delete the local installId and generate a new one.
-
-                            // 2) Wipe Keychain identity & side so next run is brand-new
-                            InstallIdentity.removeLockedSide()
-                            InstallIdentity.removeInstallId()
-
-                            // 3) Clear offline sync & bootstrap marker
-                            StreakSync.shared.debugReset()
-                            BootstrapMarker.clear()
-
-                            // 4) Reset local UI / game state
-                            await MainActor.run {
-                                store.chosenFace = nil
-                                store.currentStreak = 0
-                                store.clearRecent()
-
-                                didRestorePhase = false
-                                phase = .choosing
-                                gameplayOpacity = 0
-
-                                withTransaction(Transaction(animation: nil)) {
-                                    barPulse = nil
-                                    progression.debugResetToFirstTier()
-                                    progression.debugResetUnlocks()   // ← add this
-
-                                    // local UI state cleanup you already added
-                                    resetMapSelectUI()
-
-                                    // make sure the toast diff doesn’t immediately fire after reset
-                                    lastUnlockedCount = 1  // starter-only
-                                }
-
-                                // Clear scoreboard UI immediately
-                                scoreboardVM.heads = 0
-                                scoreboardVM.tails = 0
-                                scoreboardVM.isOnline = true
-
-                                // 5) Resume polling (or let onAppear do it)
-                                scoreboardVM.startPolling(includeLeaderboard: { isLeaderboardOpen })
-                                
-                                
-                                achievements.resetAll()
-                            }
-                        }
+                        //NADA
                     }
                     .font(.system(size: 14, weight: .semibold))
                     .padding(.horizontal, 10)
@@ -1014,29 +1008,7 @@ struct ContentView: View {
 
                     // ▶︎ Advance button
                     Button("▶︎") {
-                        // Jump into the choose-face phase so we can visually inspect that screen.
-                        // We leave all persistent identity / streak state alone.
-                        /*withAnimation(.easeInOut(duration: 0.25)) {
-                            phase = .choosing
-                            gameplayOpacity = 0     // hide live gameplay coin while in choose-face
-                        }*/
-                        /*func jumpToNextTier() {
-                            _ = progression.applyAward(len: 10_000)
-                            progression.advanceTierAfterFill()
-                        }
-                        jumpToNextTier()*/
-                        //tokenBalance &+= TOKENS_PER_FILL
-                        // DEBUG: Clear all shop purchases and reset to starter equips so you can re-test pricing.
-                        //Wipe ownership/equips in the Shop VM and persist.
-                        /*shopVM.owned.removeAll()
-                        shopVM.equipped.removeAll()
-                        shopVM.save()
-                        //Reset equipped keys locally to "starter" and sync visuals.
-                        equippedTableKey = "starter"
-                        equippedCoinKey  = "starter"
-                        syncEquippedTableToFaceAndKey()
-                        syncEquippedCoinWithVM()*/
-
+                        
                     }
                     .font(.system(size: 14, weight: .semibold))
                     .padding(.horizontal, 10)
@@ -1050,7 +1022,7 @@ struct ContentView: View {
                 .padding(.leading, 8)
             }
             #endif
-            
+            */
             
             
             
@@ -1124,6 +1096,10 @@ struct ContentView: View {
                 // Keep loop music/backwall aligned as well
                 updateTierLoop(savedTheme)
             }
+            
+            // --- Minigame: bootstrap "last finished" snapshot (once per launch) ---
+            minigameManager.refreshLastFinished()
+            
             guard !didRestorePhase else {
                 updateTierLoop(tierTheme(for: progression.currentTierName)); return
             }
@@ -1458,6 +1434,7 @@ struct ContentView: View {
             let target = "\(equippedTableKey)_table_\(side)"
             if equippedTableImage != target { equippedTableImage = target }
         }
+        
 
 
         
@@ -1493,6 +1470,85 @@ struct ContentView: View {
             }
         }
         
+        
+        // MINIGAME RESULTS POPUP OVERLAY
+        .overlay {
+            if showMinigameResults,
+               let snapshot = minigameManager.lastFinishedSnapshot {
+                MinigameResultsPopup(
+                    snapshot: snapshot,
+                    activeMinigameId: minigameManager.activeMinigameId,
+                    onDismiss: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            showMinigameResults = false
+                        }
+
+                        // Safely grab the snapshot & period id at dismissal time
+                        guard let snapshot = minigameManager.lastFinishedSnapshot else { return }
+                        let periodId = snapshot.period.id
+
+                        // Avoid double-claiming rewards for the same finished period
+                        if lastSeenFinishedPeriodId == periodId {
+                            return
+                        }
+
+                        // Determine this player's reward from their final rank
+                        if let rank = snapshot.me.rank,
+                           let brackets = snapshot.rewardBrackets,
+                           let bracket = brackets.first(where: { rank >= $0.minRank && rank <= $0.maxRank }) {
+
+                            let reward = bracket.reward
+
+                            // 1) Tokens (unchanged behavior, still delayed so the toast is visible)
+                            if let tokenAmount = reward.tokenAmount,
+                               tokenAmount > 0 {
+
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    tokenBalance &+= tokenAmount
+                                    stats.addTokensEarned(tokenAmount)
+                                    SoundManager.shared.play(["earn_token_1","earn_token_2"].randomElement()!)
+                                }
+                            }
+                            // 2) Asset unlocks
+                            if !reward.assetKeys.isEmpty {
+                                shopUnlocks.unlock(reward.assetKeys)
+                            }
+                        }
+                        // Remember that we've processed this period's results
+                        lastSeenFinishedPeriodId = periodId
+                        UserDefaults.standard.set(
+                            periodId,
+                            forKey: "LastSeenFinishedMinigamePeriodId"
+                        )
+                    }
+                )
+                .ignoresSafeArea()
+                .transition(.opacity)
+                .zIndex(1200)
+            }
+        }
+
+        .onReceive(minigameManager.$lastFinishedSnapshot) { snapshot in
+            print("DEBUG lastFinishedSnapshot changed ->",
+                  snapshot?.period.id ?? "nil")
+            
+            // Only show when we actually have a finished snapshot
+            guard let snapshot = snapshot else { return }
+            
+            let periodId = snapshot.period.id
+            
+            // If we've already processed/seen this period's results, don't show again
+            if lastSeenFinishedPeriodId == periodId {
+                return
+            }
+            
+            withAnimation(.easeInOut(duration: 0.25)) {
+                showMinigameResults = true
+            }
+        }
+
+
+        
 
         .fullScreenCover(isPresented: $isBattleMenuOpen, onDismiss: {
             // no-op
@@ -1517,8 +1573,6 @@ struct ContentView: View {
                 }
             }
         }
-
-
         
         
         // MARK: UPDATE PROMPT
@@ -1561,6 +1615,7 @@ struct ContentView: View {
             .padding(20)
             .presentationDetents([.fraction(0.28)])
         }
+        
         
         
         // MARK: BATTLE CINEMATIC
@@ -1627,6 +1682,7 @@ struct ContentView: View {
 
     }
     
+
     // MARK: - Stats Backfill
 
     /// One-time seeding of StatsStore from legacy data so players don't start from 0
@@ -1710,6 +1766,11 @@ struct ContentView: View {
     private func enterShop() {
         guard phase != .shop else { return }
         guard !isDoorsClosing else { return }
+        // Close scoreboard/leaderboard if open when entering the shop
+        withAnimation(.easeInOut(duration: 0.22)) {
+            isLeaderboardOpen = false
+            isScoreMenuOpen = false
+        }
 
         // Ensure latest remote price overrides before showing shop
         Task { _ = await RemoteShop.fetchIfNeeded(force: true) }
@@ -1823,6 +1884,17 @@ struct ContentView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
                 showNewMapToast = false
+            }
+        }
+    }
+    private func triggerMinigameToast(message: String) {
+        minigameToastMessage = message
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+            showMinigameToast = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.95)) {
+                showMinigameToast = false
             }
         }
     }
@@ -2037,8 +2109,10 @@ struct ContentView: View {
             withAnimation(.linear(duration: 0.70)) { settleBounceT = 1.0 }
             settleT = 0.0
             withAnimation(.linear(duration: 0.85)) { settleT = 1.0 }
-            // In shop (visual-only)
-            if visualOnly {
+            // In shop (visual-only) — but when a hijacking minigame is active,
+            // let the minigame own its landing audio entirely.
+            if visualOnly,
+               !(minigameManager.isSessionActive && (minigameHostConfig?.hijacksGameplayCoin ?? false)) {
                 SoundManager.shared.play(["land_1","land_2"].randomElement()!)
             }
             
@@ -2336,8 +2410,10 @@ struct ContentView: View {
                         }
                     }
 
-                    // Play landing sound
-                    SoundManager.shared.play(["land_1","land_2"].randomElement()!)
+                    // Play landing sound only when no hijacking minigame is active.
+                    if !(minigameManager.isSessionActive && (minigameHostConfig?.hijacksGameplayCoin ?? false)) {
+                        SoundManager.shared.play(["land_1","land_2"].randomElement()!)
+                    }
                 }
                 
                 pendingFlipOutcomeRaw = ""
@@ -2360,7 +2436,7 @@ private extension ContentView {
             }
 
             // === Buttons row (Map + Settings + Trophy + Scoreboard) ===
-            HStack(spacing: 8) {
+            HStack(alignment: .bottom, spacing: 8) {
                 // MAP button
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
@@ -2548,11 +2624,45 @@ private extension ContentView {
                         isSettingsOpen = false
                         isTrophiesOpen = false
                         isMoreOpen = false
+                        // Also close scoreboard/leaderboard if open
+                        isScoreMenuOpen = false
+                        isLeaderboardOpen = false
                     }
-                    minigameManager.beginSession()
+
                     Haptics.shared.tap()
+
+                    // Guard: only allow entering the minigame when we are online and
+                    // the backend is reachable.
+                    if !minigameManager.isOnlineForMinigame {
+                        triggerMinigameToast(message: "Connection required")
+                        return
+                    }
+
+                    // Guard: backend says there *is* a current minigame, but this client
+                    // doesn't have a registered host config/descriptor for it → require update.
+                    guard minigameManager.currentHostConfig != nil else {
+                        triggerMinigameToast(message: "Update required")
+                        return
+                    }
+                    // When the active minigame is Call It, go through the custom transition
+                    // path instead of starting the session immediately.
+                    if minigameManager.activeMinigameId == .callIt {
+                        
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            showCallItTransition = true
+                        }
+
+                        // After the brief blackout ramp-up, begin the actual session.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.54) {
+                            minigameManager.beginSession()
+                        }
+                    } else {
+                        // All other minigames: fall back to the normal behavior.
+                        minigameManager.beginSession()
+                    }
+                    
                 } label: {
-                    VStack(spacing: 4) {
+                    VStack(spacing: 3) {
                         if let remaining = minigameManager.timeRemaining {
                             Text(formatMinigameTimeRemaining(remaining))
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
@@ -2564,11 +2674,15 @@ private extension ContentView {
                                 .foregroundColor(.white.opacity(0.6))
                         }
   
-                        SquareHUDButton(isOutlined: false) {
+                        SquareHUDButton(
+                            isOutlined: false,
+                            buttonWidth: 62,   // tweak these numbers to taste
+                            buttonHeight: 36
+                        ) {
                             Image(systemName: "gamecontroller.fill")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 20, height: 20)
+                                .frame(width: 36, height: 36)
                                 .foregroundColor(.white.opacity(0.6))
                         }
                     }
@@ -2604,7 +2718,7 @@ private extension ContentView {
                         alignment: .leading
                     )
                     .padding(.leading, 0)
-                    .offset(y: -31)
+                    .offset(y: -24)
                     .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.5), value: showNewMapToast)
@@ -2633,7 +2747,7 @@ private extension ContentView {
                         alignment: .leading
                     )
                     .padding(.leading, 45)
-                    .offset(y: -31)
+                    .offset(y: -24)
                     .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.5), value: showNewTrophyToast)
@@ -2673,14 +2787,55 @@ private extension ContentView {
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 )
-                .fixedSize(horizontal: true, vertical: false)            // <-- hug content width
-                .padding(.leading, 132)                                  // keep your existing placement
-                .offset(y: -31)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.leading, 132)
+                .offset(y: -24)
                 .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
                 .transition(.opacity)
                 .animation(.easeInOut(duration: 0.5), value: showNewTokensToast)
                 .allowsHitTesting(false)
                 .zIndex(999)
+            }
+            
+            // === Minigame toast ===
+            if !anyBottomSheetOpen && showMinigameToast {
+                HStack(spacing: 8) {
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .opacity(0.9)
+                    Text(minigameToastMessage)
+                        .font(.system(size: 14, weight: .semibold))
+                        .lineLimit(1)
+                }
+                .foregroundColor(.white.opacity(0.9))
+                .padding(.horizontal, 14)
+                .frame(height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.65, green: 0.10, blue: 0.10, opacity: 0.96),
+                                    Color(red: 0.90, green: 0.20, blue: 0.18, opacity: 0.96)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                )
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.leading, 110)
+                .offset(y: -24)
+                .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.5), value: showMinigameToast)
+                .allowsHitTesting(false)
+                .zIndex(1000)
             }
             
             

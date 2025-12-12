@@ -18,6 +18,18 @@ final class SoundManager: NSObject {
     private var playerNode: AVAudioPlayerNode?
     private var pitchNode: AVAudioUnitTimePitch?
 
+    // MARK: - Typing SFX pool
+
+    /// Short "bleep" for typewriter / headline text, lives in Sounds/
+    private let typingSoundName = "headline_type"
+
+    /// Small pool so overlapping ticks don't stomp each other
+    private var typingPlayers: [AVAudioPlayer] = []
+    private var typingIndex: Int = 0
+
+    /// Simple throttle so we don't spam too fast
+    private var lastTypingSoundTime: TimeInterval = 0
+
     private let preferredSubdirectory = "Sounds"
 
     private override init() {}
@@ -44,7 +56,6 @@ final class SoundManager: NSObject {
 
     
     
-
     // MARK: - Public API
 
     /// Play a short one-shot SFX
@@ -71,6 +82,55 @@ final class SoundManager: NSObject {
         }
     }
 
+    /// Lazily build a small pool of players for the typing SFX.
+    private func ensureTypingPlayersLoaded() {
+        if !typingPlayers.isEmpty { return }  // already loaded
+
+        guard let url = resolveURL(for: typingSoundName, ext: "wav")
+           ?? resolveURL(for: typingSoundName, ext: "mp3") else {
+            print("Missing typing SFX: \(typingSoundName)")
+            return
+        }
+
+        do {
+            // Small pool (3–4) is plenty for overlapping ticks
+            let poolSize = 4
+            var pool: [AVAudioPlayer] = []
+            for _ in 0..<poolSize {
+                let p = try AVAudioPlayer(contentsOf: url)
+                p.volume = 1.0
+                p.prepareToPlay()
+                pool.append(p)
+            }
+            typingPlayers = pool
+        } catch {
+            print("Failed to load typing SFX: \(error.localizedDescription)")
+        }
+    }
+
+    /// Lightweight, pooled "tick" for typewriter / headline text.
+    func playTypingTick() {
+        guard !isSfxMuted else { return }
+
+        // Throttle a bit: don't fire more often than every ~60ms.
+        let now = Date().timeIntervalSince1970
+        if now - lastTypingSoundTime < 0.06 {
+            return
+        }
+        lastTypingSoundTime = now
+
+        ensureAudioSessionActive()
+        ensureTypingPlayersLoaded()
+        guard !typingPlayers.isEmpty else { return }
+
+        // Round-robin through the pool
+        let player = typingPlayers[typingIndex]
+        typingIndex = (typingIndex + 1) % typingPlayers.count
+
+        // Restart from the beginning and play
+        player.currentTime = 0
+        player.play()
+    }
 
     /// Play the base tone at a given semitone offset (for streak buildup).
     /// 1 semitone = 100 cents.
@@ -189,6 +249,11 @@ extension SoundManager {
     private static var bgmCurrentName: String?
     private static var bgmTargetVolume: Float = 0.8
 
+    /// Suspended loop info (e.g. main tier ambience) while a temporary
+    /// override (like a minigame BGM) is playing.
+    private static var bgmSuspendedName: String?
+    private static var bgmSuspendedVolume: Float = 0.8
+
 
     /// Start (or swap) a looping track with a gentle fade-in.
     /// Looks for .wav first, then .mp3.
@@ -272,6 +337,47 @@ extension SoundManager {
         guard let p = Self.bgmPlayer else { return }
         // Snap instantly to current mute target (no ramp here)
         p.volume = isMusicMuted ? 0.0 : Self.bgmTargetVolume
+    }
+
+
+    // MARK: - Loop suspension / resume (for minigames, overlays, etc.)
+
+    /// Suspend the currently playing loop (if any) with a fade-out, remembering
+    /// its identity and target volume so it can be restored later.
+    ///
+    /// Typical usage:
+    ///   SoundManager.shared.suspendCurrentLoop(fadeOut: 0.3)
+    ///   SoundManager.shared.startLoop(named: "callit_bgm", volume: 0.8)
+    ///
+    /// Then, after the temporary track is done:
+    ///   SoundManager.shared.stopLoop(fadeOut: 0.3)
+    ///   SoundManager.shared.resumeSuspendedLoop(fadeIn: 0.6)
+    func suspendCurrentLoop(fadeOut: TimeInterval = 0.3) {
+        // If nothing is playing, nothing to suspend.
+        guard let currentName = Self.bgmCurrentName,
+              let _ = Self.bgmPlayer else { return }
+
+        // Remember what was playing and at what target volume.
+        Self.bgmSuspendedName = currentName
+        Self.bgmSuspendedVolume = Self.bgmTargetVolume
+
+        // Now fade out and stop the current loop.
+        stopLoop(fadeOut: fadeOut)
+    }
+
+    /// Resume any previously suspended loop, if present. This will restart the
+    /// remembered track from the beginning, fading it in to its prior target
+    /// volume. If nothing was suspended, this is a no-op.
+    func resumeSuspendedLoop(fadeIn: TimeInterval = 0.6) {
+        guard let name = Self.bgmSuspendedName else { return }
+
+        let volume = Self.bgmSuspendedVolume
+
+        // Clear the suspension state first to avoid re-entrancy issues.
+        Self.bgmSuspendedName = nil
+
+        // Restart the original loop. It will respect isMusicMuted internally.
+        startLoop(named: name, volume: volume, fadeIn: fadeIn)
     }
 
 

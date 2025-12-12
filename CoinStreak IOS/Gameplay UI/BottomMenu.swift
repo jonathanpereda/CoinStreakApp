@@ -6,15 +6,21 @@ import Foundation
 struct SquareHUDButton<Content: View>: View {
     let isOutlined: Bool
     let outlineColor: Color
+    let buttonWidth: CGFloat
+    let buttonHeight: CGFloat
     let content: Content
 
     init(
         isOutlined: Bool = false,
         outlineColor: Color = .white,
+        buttonWidth: CGFloat = 36,
+        buttonHeight: CGFloat = 36,
         @ViewBuilder content: () -> Content
     ) {
         self.isOutlined = isOutlined
         self.outlineColor = outlineColor
+        self.buttonWidth = buttonWidth
+        self.buttonHeight = buttonHeight
         self.content = content()
     }
 
@@ -27,11 +33,17 @@ struct SquareHUDButton<Content: View>: View {
             content
                 .frame(width: 22, height: 22)
         }
-        .frame(width: 36, height: 36)
+        .frame(width: buttonWidth, height: buttonHeight)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(outlineColor.opacity(isOutlined ? 0.9 : 0.0), lineWidth: isOutlined ? 2 : 0)
-                .shadow(color: outlineColor.opacity(isOutlined ? 0.75 : 0), radius: isOutlined ? 5 : 0)
+                .stroke(
+                    outlineColor.opacity(isOutlined ? 0.9 : 0.0),
+                    lineWidth: isOutlined ? 2 : 0
+                )
+                .shadow(
+                    color: outlineColor.opacity(isOutlined ? 0.75 : 0),
+                    radius: isOutlined ? 5 : 0
+                )
         )
     }
 }
